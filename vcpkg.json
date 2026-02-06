@@ -1,0 +1,14 @@
+{
+  "name": "2d-brdf-measurement",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "eigen3",
+    "glm",
+    "spdlog",
+    "fmt",
+    "tomlplusplus",
+    "opencv4",
+    "cli11",
+    "tl-expected"
+  ]
+}

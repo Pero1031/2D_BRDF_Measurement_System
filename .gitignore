@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ===== vcpkg (manifest) =====
+vcpkg_installed/
+
+# If vcpkg is checked into the repo, these are huge and should not be tracked
+vcpkg/downloads/
+vcpkg/buildtrees/
+vcpkg/packages/
+vcpkg/
