@@ -140,13 +140,16 @@
   <ItemGroup>
     <ClCompile Include="src\Core\test.cpp" />
     <ClCompile Include="src\Driver\Mock\MockRobotArm.cpp" />
+    <ClCompile Include="src\Driver\Mock\MockSpectrometer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\Core\Recipe.hpp" />
     <ClInclude Include="include\Core\Types.hpp" />
     <ClInclude Include="include\Driver\ILightSource.hpp" />
     <ClInclude Include="include\Driver\IRobotArm.hpp" />
     <ClInclude Include="include\Driver\ISpectrometer.hpp" />
     <ClInclude Include="include\Driver\Mock\MockRobotArm.hpp" />
+    <ClInclude Include="include\Driver\Mock\MockSpectrometer.hpp" />
     <ClInclude Include="include\Math\Algebra.hpp" />
     <ClInclude Include="include\Math\MathUtils.hpp" />
   </ItemGroup>

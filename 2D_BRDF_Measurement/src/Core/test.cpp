@@ -3,8 +3,8 @@
 
 #include "Math/Algebra.hpp"
 #include "Driver/Mock/MockRobotArm.hpp"
+#include "Driver/Mock/MockSpectrometer.hpp"
 
-// 名前空間を省略して記述をスッキリさせますわ
 using namespace brdf::driver;
 
 int main() {
@@ -71,5 +71,25 @@ int main() {
     }
 
     spdlog::info("=== Test Finished ===");
+
+    spdlog::info("--- Testing MockSpectrometer ---");
+    MockSpectrometer spec;
+
+    if (spec.connect()) {
+        spec.setIntegrationTime(200.0); // 200msに設定
+
+        auto result = spec.measure();
+        if (result) {
+            // 結果の中身を少しだけ表示確認
+            auto& s = result.value();
+            spdlog::info("Spectrum captured: {} nm to {} nm", s.wavelengths.front(), s.wavelengths.back());
+            spdlog::info("Peak value around 550nm: {:.4f}", s.intensities(550 - 380));
+        }
+        else {
+            spdlog::error("Measurement failed: {}", result.error());
+        }
+        spec.disconnect();
+    }
+
     return 0;
 }
