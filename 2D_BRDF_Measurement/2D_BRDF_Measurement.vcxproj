@@ -111,7 +111,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)vcpkg\installed\x64-windows\include\eigen3;$(ProjectDir)src;$(SolutionDir)vcpkg_installed\x64-windows\include\opencv4;$(VcpkgRoot)installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)vcpkg\installed\x64-windows\include\eigen3;$(ProjectDir)src;$(SolutionDir)vcpkg_installed\x64-windows\include\opencv4;$(VcpkgRoot)installed\x64-windows\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -128,7 +128,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)vcpkg\installed\x64-windows\include\eigen3;$(ProjectDir)src;$(SolutionDir)vcpkg_installed\x64-windows\include\opencv4;$(VcpkgRoot)installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)vcpkg\installed\x64-windows\include\eigen3;$(ProjectDir)src;$(SolutionDir)vcpkg_installed\x64-windows\include\opencv4;$(VcpkgRoot)installed\x64-windows\include;$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -139,12 +139,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\Core\test.cpp" />
+    <ClCompile Include="src\Driver\Mock\MockRobotArm.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Core\Types.hpp" />
     <ClInclude Include="include\Driver\ILightSource.hpp" />
     <ClInclude Include="include\Driver\IRobotArm.hpp" />
     <ClInclude Include="include\Driver\ISpectrometer.hpp" />
+    <ClInclude Include="include\Driver\Mock\MockRobotArm.hpp" />
     <ClInclude Include="include\Math\Algebra.hpp" />
     <ClInclude Include="include\Math\MathUtils.hpp" />
   </ItemGroup>

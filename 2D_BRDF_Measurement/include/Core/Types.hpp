@@ -1,11 +1,11 @@
 ﻿/*
-* @file ser/Core/types.hpp
-*
+* @file include/Core/types.hpp
+* @brief Fundamental type definitions for the BRDF measurement system.
 */
 
 #pragma once
 
-#include <cstdint>
+#include <cstdint>  // For fixed-width integer types
 
 namespace brdf {
 

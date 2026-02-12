@@ -1,5 +1,5 @@
 ﻿/*
-* @file src/Math/Algebra.hpp
+* @file include/Math/Algebra.hpp
 * @brief Linear algebra type definitions based on Eigen.
 * @details
 * This file defines standard type aliases for vectors, matrices, quaternions,
@@ -23,6 +23,7 @@ namespace brdf {
 	using Vec2 = Eigen::Matrix<Real, 2, 1>;
 	using Vec3 = Eigen::Matrix<Real, 3, 1>;
 	using Vec4 = Eigen::Matrix<Real, 4, 1>;
+	using VecX = Eigen::Matrix<Real, Eigen::Dynamic, 1>;
 
 	using Mat2 = Eigen::Matrix<Real, 2, 2>;
 	using Mat3 = Eigen::Matrix<Real, 3, 3>;

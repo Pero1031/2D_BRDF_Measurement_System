@@ -100,7 +100,7 @@ namespace brdf {
     ///@}
 
 
-    /** @name Scalar Math Utilities
+    /** @ name Scalar Math Utilities
      * General purpose math helpers.
      */
      ///@{
