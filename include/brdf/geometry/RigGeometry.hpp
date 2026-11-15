@@ -5,11 +5,14 @@
 
 #pragma once
 
+#include <vector>
+
 #include "brdf/core/Algebra.hpp"
 #include "brdf/geometry/Frame.hpp"
 #include "brdf/geometry/Joints.hpp"
-#include "brdf/geometry/RigSetup.hpp"
 #include "brdf/geometry/Rc8Kinematics.hpp"
+#include "brdf/geometry/RigSetup.hpp"
+#include "brdf/geometry/Segment.hpp"
 
 namespace brdf::geometry {
 
@@ -41,6 +44,16 @@ namespace brdf::geometry {
         /// 旧システムの試料点ごとの角度(OutputAngles)はこの座標系で出していた。
         /// tipFrame とは φ が 90° ずれる (φ_paper = φ_tip - 90°)。新システムの標準はこちら。
         SurfaceFrame paperFrame(const Joints& right) const;
+
+        /// 左アームを折れ線で表したもの(ワールド座標)。先端から光源までの線分を含む。
+        std::vector<Segment> leftArmSegments(const Joints& left) const;
+
+        /// 右アームを折れ線で表したもの(ワールド座標)。先端から試料面までの線分を含む。
+        std::vector<Segment> rightArmSegments(const Joints& right) const;
+
+        /// 左右のアームの中心線どうしの最短距離 [mm]。
+        /// これが 2 × arm_radius を下回ると、干渉の可能性があるとみなす。
+        Real minArmDistance(const Joints& left, const Joints& right) const;
 
     private:
         RigSetup setup_;

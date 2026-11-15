@@ -5,6 +5,8 @@
 
 #include "brdf/geometry/RigGeometry.hpp"
 
+#include <algorithm>
+#include <limits>
 #include <utility>
 
 namespace brdf::geometry {
@@ -53,6 +55,40 @@ namespace brdf::geometry {
         frame.axes.col(1) = -r.col(0);
         frame.axes.col(2) = r.col(2);
         return frame;
+    }
+
+    namespace {
+        std::vector<Segment> polyline(const std::array<Vec3, 6>& p, const Vec3& base,
+                                      const Vec3& extra_end) {
+            std::vector<Segment> segments;
+            for (int i = 0; i + 1 < 6; ++i) {
+                segments.push_back({base + p[i], base + p[i + 1]});
+            }
+            segments.push_back({base + p[5], extra_end});   // 先端 → 光源 / 試料面
+            return segments;
+        }
+    }
+
+    std::vector<Segment> RigGeometry::leftArmSegments(const Joints& left) const {
+        return polyline(kinematics_.linkPoints(left), setup_.left_base_position, lightPosition(left));
+    }
+
+    std::vector<Segment> RigGeometry::rightArmSegments(const Joints& right) const {
+        return polyline(kinematics_.linkPoints(right), setup_.right_base_position,
+                        sampleHolderPose(right).translation());
+    }
+
+    Real RigGeometry::minArmDistance(const Joints& left, const Joints& right) const {
+        const auto ls = leftArmSegments(left);
+        const auto rs = rightArmSegments(right);
+
+        Real best = std::numeric_limits<Real>::max();
+        for (const Segment& a : ls) {
+            for (const Segment& b : rs) {
+                best = std::min(best, segmentDistance(a, b));
+            }
+        }
+        return best;
     }
 
 } // namespace brdf::geometry

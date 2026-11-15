@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <array>
+
 #include "brdf/core/Algebra.hpp"
 #include "brdf/core/MathUtils.hpp"
 #include "brdf/geometry/Joints.hpp"
@@ -41,7 +43,14 @@ namespace brdf::geometry {
         /// 関節角 [rad] → 先端姿勢(土台座標系)。
         Isometry3 tipPose(const Joints& q) const;
 
+        /// アームを折れ線で表したときの 6 つの点(土台座標系)。
+        /// [0]=土台の足元, [1]=第1アームの付け根, [2]=肩, [3]=肘, [4]=手首, [5]=先端。
+        /// 干渉チェックでアームを細い棒の連なりとして扱うために使う。
+        std::array<Vec3, 6> linkPoints(const Joints& q) const;
+
     private:
+        Isometry3 chain(const Joints& q, std::array<Vec3, 6>* points) const;
+
         ArmLinks links_;
     };
 

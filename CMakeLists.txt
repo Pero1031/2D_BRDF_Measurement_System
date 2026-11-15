@@ -25,9 +25,13 @@ find_package(tl-expected CONFIG REQUIRED)
 add_library(brdf_core
     src/geometry/Rc8Kinematics.cpp
     src/geometry/RigGeometry.cpp
+    src/geometry/Segment.cpp
     src/optics/Angles.cpp
-    src/driver/mock/MockRobotArm.cpp
-    src/driver/mock/MockSpectrometer.cpp
+    src/sim/BrdfModel.cpp
+    src/sim/PinholeCamera.cpp
+    src/sim/SimulatedRig.cpp
+    src/sim/MockRobotArm.cpp
+    src/sim/MockSpectralImager.cpp
 )
 add_library(brdf::core ALIAS brdf_core)
 

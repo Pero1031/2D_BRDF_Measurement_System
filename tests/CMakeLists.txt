@@ -5,6 +5,11 @@ add_executable(brdf_tests
     test_kinematics.cpp
     test_angles.cpp
     test_old_system_golden.cpp
+    test_segment.cpp
+    test_rig_safety.cpp
+    test_brdf_and_camera.cpp
+    test_sim_arm.cpp
+    test_sim_imager.cpp
     test_headers.cpp
 )
 

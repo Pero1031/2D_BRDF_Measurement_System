@@ -28,8 +28,8 @@ A detailed analysis of the previous system is in [docs/LegacySystemAnalysis.md](
 |---|---|---|
 | P0 | Foundation (CMake, tests, folder layout) | Done |
 | P1 | Geometry and angles (forward kinematics, angle computation, check against previous data) | Done |
-| P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`) | Next |
-| P3 | Project folders, TOML configuration, measurement session, CLI | Not started |
+| P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`, mock arms and imager) | Done |
+| P3 | Project folders, TOML configuration, measurement session, CLI | Next |
 | P4 | Calibration board, homography, spot XML | Not started |
 | P5 | Analysis (white-board normalization, BRDF reconstruction) | Not started |
 | P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
@@ -43,11 +43,14 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - World positions of the light, the sample and the camera: `geometry::RigGeometry`
 - Incidence and observation angles of a point on the sample: `optics::computeAngles`
 - A test that reproduces the previous system's angle tables (about 350,000 rows)
-- A mock robot arm and a mock spectrometer (`examples/mock_demo.cpp`)
+- A simulated rig: mock robot arms with joint limits and arm-to-arm clearance checks (`sim::MockRobotArm`)
+- A simulated 2D spectroradiometer that "measures" a known BRDF (Lambert or Phong) through a pinhole camera model (`sim::MockSpectralImager`)
+- Driver interfaces for the real hardware: `driver::IRobotArm`, `driver::ISpectralImager`
+- `examples/mock_demo.cpp`: one full simulated pose, from moving the arms to per-spot angles and spectra
 
 ### What does not exist yet
 
-Real hardware control, automated measurement runs, calibration-board processing and BRDF analysis.
+Real hardware control (the joint limits and arm radius in `RigSetup` are placeholders until checked against the real arms), automated measurement runs, calibration-board processing and BRDF analysis.
 
 ## Build and test
 
@@ -86,7 +89,8 @@ include/brdf/   public headers
   core/           types, matrices, math utilities
   geometry/       joint angles, forward kinematics, rig layout
   optics/         incidence / observation angle computation
-  driver/         robot and spectrometer interfaces, and mocks
+  driver/         interfaces for the robot arm and the spectral imager
+  sim/            simulator: rig, mock arm, mock imager, BRDF models, camera
   domain/         recipe (to be redesigned in P3)
 src/            implementation
 tests/          unit tests and checks against the previous system (tests/data/)

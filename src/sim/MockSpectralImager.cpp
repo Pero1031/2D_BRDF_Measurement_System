@@ -1,0 +1,124 @@
+﻿/*
+* @file src/sim/MockSpectralImager.cpp
+* @brief Simulated 2D spectroradiometer that "measures" a known BRDF.
+*/
+
+#include "brdf/sim/MockSpectralImager.hpp"
+
+#include <spdlog/spdlog.h>
+
+#include <algorithm>
+#include <cmath>
+#include <random>
+#include <sstream>
+#include <utility>
+
+#include "brdf/optics/Angles.hpp"
+
+namespace brdf::sim {
+
+    MockSpectralImager::MockSpectralImager(std::shared_ptr<const SimulatedRig> rig,
+                                           std::shared_ptr<const IBrdfModel> brdf,
+                                           MockImagerOptions options)
+        : rig_(std::move(rig)), brdf_(std::move(brdf)), options_(options) {}
+
+    Status MockSpectralImager::connect() {
+        connected_ = true;
+        spdlog::info("[Imager] Connected (mock).");
+        return {};
+    }
+
+    void MockSpectralImager::disconnect() {
+        connected_ = false;
+        spdlog::info("[Imager] Disconnected.");
+    }
+
+    Result<driver::CaptureResult> MockSpectralImager::capture(const driver::CaptureRequest& request) {
+        if (!connected_) {
+            return fail(ErrorCode::NotConnected, "imager: not connected");
+        }
+
+        // --- 要求の検査 ---
+        if (request.spots.empty()) {
+            return fail(ErrorCode::InvalidArgument, "imager: no spots requested");
+        }
+        if (!(request.integration_time_ms > 0.0)) {
+            return fail(ErrorCode::InvalidArgument, "imager: integration time must be positive");
+        }
+        const auto& wr = request.wavelengths;
+        if (!(wr.step > 0.0) || !(wr.end >= wr.start)) {
+            return fail(ErrorCode::InvalidArgument, "imager: invalid wavelength range");
+        }
+
+        // --- いまの幾何 ---
+        const geometry::SurfaceFrame sample = rig_->sampleFrame();
+        const Vec3 light = rig_->lightPosition();
+        const PinholeCamera& camera = rig_->camera();
+        const Vec3& cam_pos = camera.position();
+
+        // ピント: 要求された距離が、カメラ〜試料の実際の距離と合っているか
+        const Real actual_distance = (sample.origin - cam_pos).norm();
+        if (std::abs(request.measure_distance_mm - actual_distance) > options_.focus_tolerance_mm) {
+            std::ostringstream msg;
+            msg << "imager: measure distance " << request.measure_distance_mm
+                << " mm does not match the actual distance " << actual_distance << " mm";
+            return fail(ErrorCode::FocusError, msg.str());
+        }
+
+        // --- 波長 ---
+        driver::CaptureResult result;
+        const int n = wr.count();
+        result.wavelengths.resize(n);
+        for (int i = 0; i < n; ++i) result.wavelengths(i) = wr.start + wr.step * i;
+        result.integration_time_ms = request.integration_time_ms;
+        result.measure_distance_mm = request.measure_distance_mm;
+
+        std::mt19937 rng(options_.seed + capture_count_++);
+        std::normal_distribution<Real> gauss(0.0, 1.0);
+
+        // --- 点ごとの計算 ---
+        for (const driver::SpotRequest& spot : request.spots) {
+            if (!camera.inImage(spot.pixel)) {
+                std::ostringstream msg;
+                msg << "imager: spot " << spot.id << " (" << spot.pixel.x() << ", " << spot.pixel.y()
+                    << ") is outside the image";
+                return fail(ErrorCode::OutOfRange, msg.str());
+            }
+
+            // 画像上の位置 → 光線 → 試料面との交点
+            const Vec3 ray = camera.rayDirection(spot.pixel);
+            const Real denom = sample.zAxis().dot(ray);
+            const Real t = denom != 0.0 ? sample.zAxis().dot(sample.origin - cam_pos) / denom : -1.0;
+            if (t <= 0.0) {
+                std::ostringstream msg;
+                msg << "imager: spot " << spot.id << " does not hit the sample plane";
+                return fail(ErrorCode::OutOfRange, msg.str());
+            }
+            const Vec3 patch = cam_pos + t * ray;
+
+            // 交点での角度と照度
+            const optics::GeometryAngles angles = optics::computeAngles(sample, patch, light, cam_pos);
+            const Real light_distance = (light - patch).norm();
+            const Real cos_i = std::max(Real(0), std::cos(angles.incidence.theta));   // 面の裏から当たる光は 0
+            const Real irradiance = options_.light_intensity * cos_i / (light_distance * light_distance);
+
+            driver::SpotSpectrum out;
+            out.id = spot.id;
+            out.pixel = spot.pixel;
+            out.values.resize(n);
+            for (int i = 0; i < n; ++i) {
+                const Real radiance = brdf_->value(result.wavelengths(i), angles) * irradiance;
+                Real signal = radiance * request.integration_time_ms;
+                if (options_.noise_relative > 0.0) {
+                    signal *= 1.0 + options_.noise_relative * gauss(rng);
+                }
+                out.values(i) = signal;
+            }
+            result.spots.push_back(std::move(out));
+        }
+
+        spdlog::debug("[Imager] captured {} spot(s)", result.spots.size());
+        return result;
+    }
+
+} // namespace brdf::sim

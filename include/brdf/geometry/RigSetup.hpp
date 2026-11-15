@@ -6,6 +6,7 @@
 #pragma once
 
 #include "brdf/core/Algebra.hpp"
+#include "brdf/geometry/JointLimits.hpp"
 #include "brdf/geometry/Rc8Kinematics.hpp"
 
 namespace brdf::geometry {
@@ -32,6 +33,13 @@ namespace brdf::geometry {
 
         /// 右アーム先端から試料面までの距離(先端の Z 方向)。アクリル板 5mm + 紙 1mm (旧 calcRightTip の akuriru, paper)
         Real sample_surface_offset = 6.0;
+
+        /// 関節の可動域(左右共通)。既定値は仮の値。実機の仕様で必ず確認すること。
+        JointLimits joint_limits;
+
+        /// 干渉チェックで、アームを太さのある棒として扱うときの半径 [mm](左右共通)。
+        /// 既定値は仮の値(余裕を持たせた安全側)。実機の寸法で必ず確認すること。
+        Real arm_radius = 40.0;
     };
 
 } // namespace brdf::geometry
