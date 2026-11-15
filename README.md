@@ -29,8 +29,8 @@ A detailed analysis of the previous system is in [docs/LegacySystemAnalysis.md](
 | P0 | Foundation (CMake, tests, folder layout) | Done |
 | P1 | Geometry and angles (forward kinematics, angle computation, check against previous data) | Done |
 | P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`, mock arms and imager) | Done |
-| P3 | Project folders, TOML configuration, measurement session, CLI | Next |
-| P4 | Calibration board, homography, spot XML | Not started |
+| P3 | Project folders, TOML configuration, measurement session, CLI | Done |
+| P4 | Calibration board, homography, spot XML | Next |
 | P5 | Analysis (white-board normalization, BRDF reconstruction) | Not started |
 | P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
 | P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
@@ -47,16 +47,48 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A simulated 2D spectroradiometer that "measures" a known BRDF (Lambert or Phong) through a pinhole camera model (`sim::MockSpectralImager`)
 - Driver interfaces for the real hardware: `driver::IRobotArm`, `driver::ISpectralImager`
 - `examples/mock_demo.cpp`: one full simulated pose, from moving the arms to per-spot angles and spectra
+- Project folders with `setup.toml` (rig layout) and `recipe.toml` (poses, spots, capture settings); mistyped keys and wrong values are reported with the file, section and key
+- A measurement session that runs a recipe on the (simulated) devices and saves per-spot angles and spectra as CSV, together with a record of the settings used
+- A pre-flight check that finds joint-limit violations, arm collisions (including on the way to a pose) and spots whose light or camera is behind the surface, without moving anything
+- Import of the previous system's pose CSV (all 52 poses are accepted)
+- The `brdf` command line: `init`, `check`, `run`, `angles`, `import-poses`
 
 ### What does not exist yet
 
-Real hardware control, automated measurement runs, calibration-board processing and BRDF analysis.
+Real hardware control (`mode = "real"` reports "not supported yet"), calibration-board processing (the simulator uses its camera model instead of a homography) and BRDF analysis.
 
 ## Hardware
 
 - Robot arms: 2 × DENSO **VP-6242** (6-axis) with RC8 controllers. The link dimensions in `geometry::ArmLinks` match the manufacturer's outline drawing, and the joint limits in `geometry::JointLimits` are the factory software-limit values from the VP robot manual.
 - Spectroradiometer: TOPCON SR-5000H.
 - The arm radius used by the clearance check (`RigSetup::arm_radius`) is an estimate from the outline drawing, and it does not include the sample plate.
+
+## Quick start
+
+```bash
+build/Debug/brdf.exe check examples/sim_project     # pre-flight check, nothing is moved
+build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; type OK for the checklist (or --yes)
+```
+
+| Command | What it does |
+|---|---|
+| `brdf init <dir>` | create a project folder with template `setup.toml` and `recipe.toml` |
+| `brdf check <dir>` | check limits, collisions and angles without moving any device |
+| `brdf run <dir> [--kind sample\|white\|calib] [--yes]` | run the measurement and save the result under `result/<date>_<time>_<kind>/` |
+| `brdf angles <dir>` | write only the angles of every pose and spot |
+| `brdf import-poses <csv> [--out recipe.toml]` | build a recipe from the previous system's pose CSV |
+
+A project folder holds everything about one measurement, and no absolute path is written in it:
+
+```
+my_measurement/
+  setup.toml      rig layout (arm dimensions and limits, light and camera positions) and device mode
+  recipe.toml     poses, spots on the sample (mm), capture settings, checklist
+  result/<date>_<time>_<kind>/
+    measurements.csv     one row per (pose, spot): angles [deg] then the spectrum
+    run_manifest.toml    when and how it was measured
+    setup.toml, recipe.toml   copies of the settings used
+```
 
 ## Build and test
 
@@ -96,11 +128,13 @@ include/brdf/   public headers
   geometry/       joint angles, forward kinematics, rig layout
   optics/         incidence / observation angle computation
   driver/         interfaces for the robot arm and the spectral imager
+  io/             setup.toml and recipe.toml reading / writing, pose CSV import
+  app/            measurement session, pre-flight check, project layout, commands
   sim/            simulator: rig, mock arm, mock imager, BRDF models, camera
-  domain/         recipe (to be redesigned in P3)
-src/            implementation
+  domain/         recipe (poses, spots, capture settings)
+src/            implementation (src/cli: the `brdf` command line)
 tests/          unit tests and checks against the previous system (tests/data/)
-examples/       demos that run on mocks only
+examples/       the mock demo and a ready-to-run simulated project (examples/sim_project)
 docs/           analysis, design, plan
 tools/          helper scripts
 ```

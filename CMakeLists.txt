@@ -18,6 +18,8 @@ endif()
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(tl-expected CONFIG REQUIRED)
+find_package(tomlplusplus CONFIG REQUIRED)
+find_package(CLI11 CONFIG REQUIRED)
 
 # ---------------------------------------------------------------------------
 # brdf_core: ライブラリ本体(計算・ドライバのインターフェース・モック)
@@ -32,6 +34,16 @@ add_library(brdf_core
     src/sim/SimulatedRig.cpp
     src/sim/MockRobotArm.cpp
     src/sim/MockSpectralImager.cpp
+    src/sim/CameraSpotProjector.cpp
+    src/io/SetupConfig.cpp
+    src/io/RecipeFile.cpp
+    src/app/AngleTable.cpp
+    src/app/Preflight.cpp
+    src/app/MeasurementSession.cpp
+    src/app/DeviceFactory.cpp
+    src/app/ResultFiles.cpp
+    src/app/ProjectLayout.cpp
+    src/app/Commands.cpp
 )
 add_library(brdf::core ALIAS brdf_core)
 
@@ -41,7 +53,17 @@ target_include_directories(brdf_core PUBLIC
 target_link_libraries(brdf_core PUBLIC
     Eigen3::Eigen
     spdlog::spdlog
-    tl::expected)
+    tl::expected
+    tomlplusplus::tomlplusplus)
+
+# toml++ のヘッダは src/io 内だけで使う(公開ヘッダには出さない)が、リンクは必要
+target_compile_definitions(brdf_core PUBLIC BRDF_VERSION="${PROJECT_VERSION}")
+
+# ---------------------------------------------------------------------------
+# brdf: コマンドライン
+# ---------------------------------------------------------------------------
+add_executable(brdf src/cli/main.cpp)
+target_link_libraries(brdf PRIVATE brdf::core CLI11::CLI11)
 
 # ---------------------------------------------------------------------------
 # examples: モックだけで動くデモ

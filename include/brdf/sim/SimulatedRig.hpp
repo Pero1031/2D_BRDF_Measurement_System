@@ -40,9 +40,10 @@ namespace brdf::sim {
         Vec3 lightPosition() const;                  ///< 光源の位置(ワールド座標)
         geometry::SurfaceFrame sampleFrame() const;  ///< 試料の座標系(紙の座標系)
 
-    private:
+        /// 既定のカメラ設定: 位置は装置の camera_position、向きは典型的な測定姿勢での試料位置。
         static PinholeCameraSetup defaultCamera(const geometry::RigGeometry& geometry);
 
+    private:
         geometry::RigGeometry geometry_;
         PinholeCamera camera_;
         geometry::Joints left_;

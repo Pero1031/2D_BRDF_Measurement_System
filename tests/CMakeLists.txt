@@ -10,6 +10,11 @@ add_executable(brdf_tests
     test_brdf_and_camera.cpp
     test_sim_arm.cpp
     test_sim_imager.cpp
+    test_setup_config.cpp
+    test_recipe_file.cpp
+    test_preflight.cpp
+    test_session.cpp
+    test_commands.cpp
     test_headers.cpp
 )
 

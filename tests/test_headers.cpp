@@ -1,6 +1,5 @@
 ﻿// 公開ヘッダがそれぞれ単独で(他のヘッダを先に include しなくても)コンパイルできることの確認。
 // ヘッダを移動・編集したときに include の誤りを見つけるためのテスト。
-// 各ヘッダを 1 つずつ、先頭に置いて確認するため、ここでは「どれか 1 つでも壊れていれば失敗する」形にしている。
 #include "brdf/core/Types.hpp"
 #include "brdf/core/Algebra.hpp"
 #include "brdf/core/MathUtils.hpp"
@@ -21,6 +20,18 @@
 #include "brdf/sim/SimulatedRig.hpp"
 #include "brdf/sim/MockRobotArm.hpp"
 #include "brdf/sim/MockSpectralImager.hpp"
+#include "brdf/sim/CameraSpotProjector.hpp"
+#include "brdf/io/SetupConfig.hpp"
+#include "brdf/io/RecipeFile.hpp"
+#include "brdf/app/SpotProjector.hpp"
+#include "brdf/app/Devices.hpp"
+#include "brdf/app/DeviceFactory.hpp"
+#include "brdf/app/AngleTable.hpp"
+#include "brdf/app/Preflight.hpp"
+#include "brdf/app/MeasurementSession.hpp"
+#include "brdf/app/ResultFiles.hpp"
+#include "brdf/app/ProjectLayout.hpp"
+#include "brdf/app/Commands.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

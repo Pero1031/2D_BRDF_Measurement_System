@@ -1,0 +1,52 @@
+# setup.toml - 装置の配置と、使うデバイス
+# 長さは mm、角度は度。
+# 注意: カメラ位置(camera_position)は測定日ごとに合わせ直す値です。
+#       測定結果と一緒に、この設定のコピーが保存されます。
+
+[devices]
+mode = "sim"   # "sim" = シミュレーション、"real" = 実機(未対応)
+
+[arm]
+radius_mm = 60.0   # 干渉チェックで、アームを太さのある棒として扱うときの半径
+
+[arm.links]   # DENSO VP-6242 の外形図の寸法
+base_height = 280.0
+upper_arm = 210.0
+elbow_offset = 75.0
+forearm = 210.0
+wrist = 70.0
+elbow_fixed_angle_deg = 90.0
+
+[arm.limits]   # VP-6242 のソフトウェアリミット(出荷時設定値)。J1〜J6 の順
+lower_deg = [-160.0, -120.0, 19.0, -160.0, -120.0, -360.0]
+upper_deg = [160.0, 120.0, 160.0, 160.0, 120.0, 360.0]
+
+[rig]
+left_base = [0.0, 0.0, 0.0]   # 左アーム(光源側)の土台位置 = 世界座標の原点
+right_base = [0.0, 945.0, 0.0]   # 右アーム(試料側)の土台位置
+light_offset = [-30.0, 108.0, 0.0]   # 左アーム先端の座標系で見た光源の位置
+camera_position = [1136.0, 728.0, 560.0]   # 2D分光放射計の位置
+sample_surface_offset = 6.0   # 右アーム先端から試料面まで(アクリル 5 + 紙 1)
+
+# ---- ここから下はシミュレーション(mode = "sim")のときだけ使う設定 ----
+
+[sim.camera]
+image_width = 1376
+image_height = 1024
+pixels_per_mm = 1.81
+# target = [0.0, 0.0, 0.0]   # 省略すると、典型的な測定姿勢での試料位置を向く
+
+[sim.imager]
+light_intensity = 1000000.0
+noise_relative = 0.0   # 0 ならノイズなし
+seed = 12345
+focus_tolerance_mm = 20.0
+
+[sim.sample]   # シミュレーションで測られる試料
+model = "lambert"   # "lambert" または "phong"
+peak_nm = 550.0
+width_nm = 60.0
+peak = 0.8
+base = 0.05
+specular = 0.5   # phong のみ
+shininess = 50.0   # phong のみ
