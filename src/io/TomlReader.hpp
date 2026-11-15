@@ -57,6 +57,15 @@ namespace brdf::io::detail {
             return {};
         }
 
+        Status boolean(std::string_view key, bool& out) {
+            const toml::node* n = find(key);
+            if (!n) return {};
+            auto v = n->value<bool>();
+            if (!v) return bad(key, "must be true or false");
+            out = *v;
+            return {};
+        }
+
         Status string(std::string_view key, std::string& out) {
             const toml::node* n = find(key);
             if (!n) return {};

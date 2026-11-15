@@ -62,8 +62,8 @@ namespace {
         return std::make_shared<LambertBrdf>(flatCurve(albedo));
     }
 
-    // 撮影結果の独立した期待値(Lambert、ノイズなし): ρ/π · I0 · cosθi / d² · 積分時間
-    Real expectedLambert(const World& w, const Vec2& pixel, Real albedo, Real intensity, Real integration_ms) {
+    // 撮影結果の独立した期待値(Lambert、ノイズなし): ρ/π · I0 · cosθi / d²(校正済みの分光放射輝度)
+    Real expectedLambert(const World& w, const Vec2& pixel, Real albedo, Real intensity) {
         const auto& cam = w.rig->camera();
         const auto frame = w.rig->sampleFrame();
         const Vec3 ray = cam.rayDirection(pixel);
@@ -72,7 +72,7 @@ namespace {
 
         const auto angles = optics::computeAngles(frame, patch, w.rig->lightPosition(), cam.position());
         const Real d = (w.rig->lightPosition() - patch).norm();
-        return albedo / PI * intensity * std::max(0.0, std::cos(angles.incidence.theta)) / (d * d) * integration_ms;
+        return albedo / PI * intensity * std::max(0.0, std::cos(angles.incidence.theta)) / (d * d);
     }
 
 } // namespace
@@ -153,7 +153,7 @@ TEST_CASE("MockSpectralImager measures a Lambert surface as expected", "[sim][im
 
     Real first = 0, last = 0;
     for (std::size_t i = 0; i < pixels.size(); ++i) {
-        const Real expected = expectedLambert(w, pixels[i], 0.5, 2.0e6, 100.0);
+        const Real expected = expectedLambert(w, pixels[i], 0.5, 2.0e6);
         INFO("spot " << i);
         CHECK(expected > 0.0);
         // 波長によらない一定の反射率なので、全波長で同じ値
@@ -166,14 +166,16 @@ TEST_CASE("MockSpectralImager measures a Lambert surface as expected", "[sim][im
     CHECK(std::abs(first - last) > 1e-9 * first);
 }
 
-TEST_CASE("the signal is proportional to the integration time", "[sim][imager]") {
+TEST_CASE("the radiance does not depend on the integration time", "[sim][imager]") {
+    // 実機は校正済みの分光放射輝度を返すので、積分時間を変えても値は変わらない
+    // (積分時間は、ノイズや飽和に効くだけ)。試料と白色板で積分時間が違っても、比が取れる。
     World w(lambert(0.5));
 
     const auto a = w.imager.capture(w.request({kCentre}, 100.0));
     const auto b = w.imager.capture(w.request({kCentre}, 250.0));
     REQUIRE(a.has_value());
     REQUIRE(b.has_value());
-    CHECK_THAT(b->spots[0].values(10), WithinRel(2.5 * a->spots[0].values(10), 1e-12));
+    CHECK_THAT(b->spots[0].values(10), WithinRel(a->spots[0].values(10), 1e-12));
 }
 
 TEST_CASE("a coloured sample shows its spectral peak", "[sim][imager]") {

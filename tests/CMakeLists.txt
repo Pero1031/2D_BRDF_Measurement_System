@@ -1,4 +1,4 @@
-find_package(Catch2 3 CONFIG REQUIRED)
+﻿find_package(Catch2 3 CONFIG REQUIRED)
 
 add_executable(brdf_tests
     test_math.cpp
@@ -18,6 +18,8 @@ add_executable(brdf_tests
     test_calibration.cpp
     test_calibrate.cpp
     test_spot_xml.cpp
+    test_analysis.cpp
+    test_analyze_command.cpp
     test_headers.cpp
 )
 

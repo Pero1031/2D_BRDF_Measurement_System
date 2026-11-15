@@ -53,6 +53,12 @@ lens = "STANDARD"   # "WIDE" / "STANDARD" / "TELE" / "MACRO"
 # image_width = 2448   # 省略すると、機種とビニングから決まる
 # image_height = 2048
 
+[analysis]   # brdf analyze の設定
+white_reflectance = 0.99   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)
+min_wavelength_nm = 380.0   # 出力する波長の範囲。LED の出力が足りない 380 nm 付近と 770 nm 付近は信頼性が低い
+max_wavelength_nm = 780.0
+irradiance_correction = false   # 試料の点と反射板の基準点の照度の違い(cos θi / d²)を補正する。false は旧システムと同じ
+
 [spot_xml]   # brdf spots が作る、スポット定義ファイル(ROI の大きさとビニングは [imager] の値)
 spot_size = 2.0   # 各スポットの一辺 [pixel]
 
@@ -76,3 +82,6 @@ peak = 0.8
 base = 0.05
 specular = 0.5   # phong のみ
 shininess = 50.0   # phong のみ
+
+[sim.white]   # シミュレータの標準拡散反射板(brdf run --kind white で測られる)
+reflectance = 0.99

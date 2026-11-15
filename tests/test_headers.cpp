@@ -41,6 +41,9 @@
 #include "brdf/vision/HomographyFit.hpp"
 #include "brdf/vision/CircleGridDetector.hpp"
 #include "brdf/app/Calibrate.hpp"
+#include "brdf/app/Analyze.hpp"
+#include "brdf/analysis/RadianceFactor.hpp"
+#include "brdf/io/MeasurementsCsv.hpp"
 #include "brdf/io/SpotXml.hpp"
 #include "brdf/calibration/SampleToBoard.hpp"
 

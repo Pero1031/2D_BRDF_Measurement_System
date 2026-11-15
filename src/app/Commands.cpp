@@ -172,6 +172,13 @@ namespace brdf::app {
         domain::Recipe& recipe = loaded->recipe;
         if (options.kind) recipe.kind = *options.kind;
 
+        // 白色板の測定は、基準点(試料座標の原点 = クロスヘア)の 1 点だけを測る。
+        // 反射板は小さく試料全域に置けないので、この 1 点を、そのポーズの代表値にする(旧システムと同じ)。
+        if (recipe.kind == domain::MeasurementKind::White) {
+            recipe.spots = {{1, Vec2(0.0, 0.0)}};
+            spdlog::info("White plate: measuring only the reference point (0, 0) at each pose");
+        }
+
         // 1. 事前検査: 実機を動かす前に、可動域・干渉を確認する
         const geometry::RigGeometry geometry(setup.rig);
         const PreflightReport report = preflight(geometry, recipe);
@@ -183,7 +190,7 @@ namespace brdf::app {
         }
 
         // 2. 装置の組み立て(real のときはここでエラーになる)と、画像上の位置への変換
-        auto devices = makeDevices(setup);
+        auto devices = makeDevices(setup, recipe.kind);
         if (!devices) return tl::unexpected(devices.error());
         if (setup.calibration.projector == "board") {
             auto projector = loadBoardProjector(layout, *loaded);

@@ -164,7 +164,7 @@ namespace brdf::sim {
             out.values.resize(n);
             for (int i = 0; i < n; ++i) {
                 const Real radiance = brdf_->value(result.wavelengths(i), angles) * irradiance;
-                Real signal = radiance * request.integration_time_ms;
+                Real signal = radiance;   // 実機は校正済みの分光放射輝度を返す(積分時間によらない)
                 if (options_.noise_relative > 0.0) {
                     signal *= 1.0 + options_.noise_relative * gauss(rng);
                 }

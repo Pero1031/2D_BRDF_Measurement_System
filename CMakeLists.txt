@@ -40,6 +40,9 @@ add_library(brdf_core
     src/io/RecipeFile.cpp
     src/io/CalibrationFile.cpp
     src/io/SpotXml.cpp
+    src/io/MeasurementsCsv.cpp
+    src/analysis/RadianceFactor.cpp
+    src/app/Analyze.cpp
     src/app/AngleTable.cpp
     src/app/Preflight.cpp
     src/app/MeasurementSession.cpp

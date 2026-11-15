@@ -9,6 +9,13 @@ build/Debug/brdf.exe run   examples/sim_project     # type OK for the checklist 
 build/Debug/brdf.exe angles examples/sim_project    # only the angles of every pose and spot
 ```
 
+To get the reflectance, measure the white plate at the same poses and analyse:
+
+```bash
+build/Debug/brdf.exe run     examples/sim_project --kind white --yes   # only the reference point (0, 0) of each pose
+build/Debug/brdf.exe analyze examples/sim_project                      # add --irradiance-correction to remove the lighting difference
+```
+
 Results are written to `result/<date>_<time>_<kind>/`:
 
 | File | Content |
@@ -16,6 +23,8 @@ Results are written to `result/<date>_<time>_<kind>/`:
 | `measurements.csv` | one row per (pose, spot): angles in degrees, then the spectrum |
 | `run_manifest.toml` | when and how it was measured |
 | `setup.toml`, `recipe.toml` | copies of the settings used for this run |
+
+Analysis writes `result/<date>_<time>_analysis/` with `radiance_factor.csv`, `brdf.csv` and `analysis_manifest.toml`.
 
 Files in this folder:
 

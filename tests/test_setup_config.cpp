@@ -38,6 +38,11 @@ namespace {
         CHECK(a.imager.width() == b.imager.width());
         CHECK(a.imager.height() == b.imager.height());
         CHECK_THAT(a.spot_xml.spot_size, WithinAbs(b.spot_xml.spot_size, 1e-12));
+        CHECK_THAT(a.analysis.white_reflectance, WithinAbs(b.analysis.white_reflectance, 1e-12));
+        CHECK_THAT(a.analysis.min_wavelength_nm, WithinAbs(b.analysis.min_wavelength_nm, 1e-12));
+        CHECK_THAT(a.analysis.max_wavelength_nm, WithinAbs(b.analysis.max_wavelength_nm, 1e-12));
+        CHECK(a.analysis.irradiance_correction == b.analysis.irradiance_correction);
+        CHECK_THAT(a.sim.white_reflectance, WithinAbs(b.sim.white_reflectance, 1e-12));
         CHECK_THAT(a.sim.camera.pixels_per_mm, WithinAbs(b.sim.camera.pixels_per_mm, 1e-9));
         REQUIRE(a.sim.camera.target.has_value() == b.sim.camera.target.has_value());
         if (a.sim.camera.target) checkVec(*a.sim.camera.target, *b.sim.camera.target);
@@ -97,6 +102,11 @@ TEST_CASE("a modified setup survives a write/read round trip", "[config]") {
     c.imager.lens = "WIDE";
     c.imager.image_width = 640;
     c.spot_xml.spot_size = 3.0;
+    c.analysis.white_reflectance = 0.97;
+    c.analysis.min_wavelength_nm = 400.0;
+    c.analysis.max_wavelength_nm = 760.0;
+    c.analysis.irradiance_correction = true;
+    c.sim.white_reflectance = 0.95;
     c.sim.imager.noise_relative = 0.02;
     c.sim.imager.seed = 99;
     c.sim.sample.model = "phong";
@@ -166,6 +176,14 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
         CHECK_THAT(errorOf("[calibration.board]\npitch_xx = 25\n"), ContainsSubstring("unknown key 'pitch_xx'"));
         CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"up\"\n"), ContainsSubstring("board_u"));
         CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"+x\"\nboard_v = \"-x\"\n"), ContainsSubstring("different axes"));
+    }
+    SECTION("analysis settings") {
+        CHECK_THAT(errorOf("[analysis]\nwhite_reflectance = 0\n"), ContainsSubstring("white_reflectance"));
+        CHECK_THAT(errorOf("[analysis]\nwhite_reflectance = 3\n"), ContainsSubstring("white_reflectance"));
+        CHECK_THAT(errorOf("[analysis]\nmin_wavelength_nm = 700\nmax_wavelength_nm = 500\n"), ContainsSubstring("smaller than max_wavelength_nm"));
+        CHECK_THAT(errorOf("[analysis]\nirradiance_correction = \"yes\"\n"), ContainsSubstring("true or false"));
+        CHECK_THAT(errorOf("[analysis]\nwhite_reflectence = 0.9\n"), ContainsSubstring("unknown key 'white_reflectence'"));
+        CHECK_THAT(errorOf("[sim.white]\nreflectance = 0\n"), ContainsSubstring("reflectance"));
     }
     SECTION("imager settings") {
         CHECK_THAT(errorOf("[imager]\ndevice = \"SR9000\"\n"), ContainsSubstring("SR5100"));

@@ -10,6 +10,8 @@
 #include <set>
 #include <sstream>
 
+#include "CsvLine.hpp"
+
 namespace brdf::io {
 
     namespace {
@@ -22,30 +24,6 @@ namespace brdf::io {
                 out += c;
             }
             return out + "\"";
-        }
-
-        // 引用符つきのセルに対応した、1 行の分割
-        std::vector<std::string> splitCsvLine(const std::string& line) {
-            std::vector<std::string> cells;
-            std::string cur;
-            bool quoted = false;
-            for (std::size_t i = 0; i < line.size(); ++i) {
-                const char c = line[i];
-                if (quoted) {
-                    if (c == '"' && i + 1 < line.size() && line[i + 1] == '"') { cur += '"'; ++i; }
-                    else if (c == '"') quoted = false;
-                    else cur += c;
-                } else if (c == '"') {
-                    quoted = true;
-                } else if (c == ',') {
-                    cells.push_back(cur);
-                    cur.clear();
-                } else {
-                    cur += c;
-                }
-            }
-            cells.push_back(cur);
-            return cells;
         }
 
         const char* const kHeader = "pose,h11,h12,h13,h21,h22,h23,h31,h32,h33,rms_px,max_px,circles";
@@ -86,7 +64,7 @@ namespace brdf::io {
             if (!line.empty() && line.back() == '\r') line.pop_back();
             if (line.empty()) continue;
 
-            const auto cells = splitCsvLine(line);
+            const auto cells = detail::splitCsvLine(line);
             if (cells.size() != 13) return err(lineno, "expected 13 columns, found " + std::to_string(cells.size()));
 
             PoseCalibration c;

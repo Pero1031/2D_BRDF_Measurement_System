@@ -7,6 +7,7 @@
 *   brdf calibrate <dir>                     キャリブボードを撮影して、ポーズごとのホモグラフィを求める
 *   brdf run   <dir> [--kind K] [--yes]      測定を実行して結果を保存する
 *   brdf angles <dir>                        角度だけを出力する
+*   brdf analyze <dir> [--sample R] [--white R]  試料と白色板の測定から、放射輝度率と BRDF を計算する
 *   brdf spots <dir>                         SR-5000 用のスポット定義ファイル(XML)を、ポーズごとに出力する
 *   brdf import-poses <csv> [--out F]        旧システムのポーズ CSV から recipe.toml を作る
 */
@@ -17,6 +18,7 @@
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
 
+#include "brdf/app/Analyze.hpp"
 #include "brdf/app/Calibrate.hpp"
 #include "brdf/app/Commands.hpp"
 
@@ -98,6 +100,24 @@ int main(int argc, char** argv) {
         auto r = brdf::app::exportAngles(angles_dir);
         if (!r) { exit_code = reportError(r.error()); return; }
         spdlog::info("Wrote {}", (*r / "angles.csv").string());
+    });
+
+    // --- analyze ---
+    std::string an_dir, an_sample, an_white;
+    bool an_correct = false;
+    auto* analyze = app.add_subcommand("analyze", "Compute the radiance factor and the BRDF from a sample run and a white-plate run");
+    analyze->add_option("dir", an_dir, "project folder")->required();
+    analyze->add_option("--sample", an_sample, "result folder of the sample run (default: the latest)");
+    analyze->add_option("--white", an_white, "result folder of the white-plate run (default: the latest)");
+    analyze->add_flag("--irradiance-correction", an_correct,
+                      "correct for the different irradiance at the sample point and the white reference point");
+    analyze->callback([&] {
+        brdf::app::AnalyzeOptions options;
+        options.sample_run = an_sample;
+        options.white_run = an_white;
+        if (an_correct) options.irradiance_correction = true;
+        auto r = brdf::app::analyzeProject(an_dir, options);
+        if (!r) { exit_code = reportError(r.error()); return; }
     });
 
     // --- spots ---

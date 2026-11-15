@@ -7,6 +7,7 @@
 
 #include "brdf/app/Devices.hpp"
 #include "brdf/core/Error.hpp"
+#include "brdf/domain/Recipe.hpp"
 #include "brdf/io/SetupConfig.hpp"
 
 namespace brdf::app {
@@ -17,6 +18,9 @@ namespace brdf::app {
     ///
     /// projector は、[calibration] projector = "camera-model" のときだけ設定される。
     /// "board" のときは空で、校正結果(calibration/homographies.csv)を読み込んだ側が設定する。
-    Result<Devices> makeDevices(const io::SetupConfig& setup);
+    ///
+    /// kind が White のとき、シミュレータは標準拡散反射板(完全拡散、反射率は [sim.white])を測る。
+    Result<Devices> makeDevices(const io::SetupConfig& setup,
+                                domain::MeasurementKind kind = domain::MeasurementKind::Sample);
 
 } // namespace brdf::app

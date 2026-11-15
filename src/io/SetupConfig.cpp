@@ -104,6 +104,17 @@ namespace brdf::io {
             if (!positive(c.spot_xml.spot_size)) {
                 return fail(ErrorCode::InvalidArgument, "setup: [spot_xml] spot_size must be positive");
             }
+            const auto& an = c.analysis;
+            if (!positive(an.white_reflectance) || an.white_reflectance > 2.0) {
+                return fail(ErrorCode::InvalidArgument, "setup: [analysis] white_reflectance must be in (0, 2]");
+            }
+            if (!(an.min_wavelength_nm < an.max_wavelength_nm) || !positive(an.min_wavelength_nm)) {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [analysis] min_wavelength_nm must be positive and smaller than max_wavelength_nm");
+            }
+            if (!positive(c.sim.white_reflectance) || c.sim.white_reflectance > 2.0) {
+                return fail(ErrorCode::InvalidArgument, "setup: [sim.white] reflectance must be in (0, 2]");
+            }
             if (c.sim.sample.model != "lambert" && c.sim.sample.model != "phong") {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.sample] model must be \"lambert\" or \"phong\"");
             }
@@ -224,6 +235,17 @@ namespace brdf::io {
             BRDF_TRY(s->finish());
         }
 
+        // --- [analysis] ---
+        {
+            auto s = top.child("analysis");
+            if (!s) return tl::unexpected(s.error());
+            BRDF_TRY(s->number("white_reflectance", c.analysis.white_reflectance));
+            BRDF_TRY(s->number("min_wavelength_nm", c.analysis.min_wavelength_nm));
+            BRDF_TRY(s->number("max_wavelength_nm", c.analysis.max_wavelength_nm));
+            BRDF_TRY(s->boolean("irradiance_correction", c.analysis.irradiance_correction));
+            BRDF_TRY(s->finish());
+        }
+
         // --- [spot_xml] ---
         {
             auto s = top.child("spot_xml");
@@ -268,6 +290,10 @@ namespace brdf::io {
             BRDF_TRY(sample->number("base", ss.base));
             BRDF_TRY(sample->number("specular", ss.specular));
             BRDF_TRY(sample->number("shininess", ss.shininess));
+            auto white = sim->child("white");
+            if (!white) return tl::unexpected(white.error());
+            BRDF_TRY(white->number("reflectance", c.sim.white_reflectance));
+            BRDF_TRY(white->finish());
             BRDF_TRY(sample->finish());
 
             BRDF_TRY(sim->finish());
@@ -366,6 +392,13 @@ namespace brdf::io {
         else o << "# image_height = " << c.imager.height() << "\n";
         o << "\n";
 
+        o << "[analysis]   # brdf analyze の設定\n"
+          << "white_reflectance = " << num(c.analysis.white_reflectance) << "   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)\n"
+          << "min_wavelength_nm = " << num(c.analysis.min_wavelength_nm) << "   # 出力する波長の範囲。LED の出力が足りない 380 nm 付近と 770 nm 付近は信頼性が低い\n"
+          << "max_wavelength_nm = " << num(c.analysis.max_wavelength_nm) << "\n"
+          << "irradiance_correction = " << (c.analysis.irradiance_correction ? "true" : "false")
+          << "   # 試料の点と反射板の基準点の照度の違い(cos θi / d²)を補正する。false は旧システムと同じ\n\n";
+
         o << "[spot_xml]   # brdf spots が作る、スポット定義ファイル(ROI の大きさとビニングは [imager] の値)\n"
           << "spot_size = " << num(c.spot_xml.spot_size) << "   # 各スポットの一辺 [pixel]\n\n";
 
@@ -393,7 +426,10 @@ namespace brdf::io {
           << "peak = " << num(c.sim.sample.peak) << "\n"
           << "base = " << num(c.sim.sample.base) << "\n"
           << "specular = " << num(c.sim.sample.specular) << "   # phong のみ\n"
-          << "shininess = " << num(c.sim.sample.shininess) << "   # phong のみ\n";
+          << "shininess = " << num(c.sim.sample.shininess) << "   # phong のみ\n\n";
+
+        o << "[sim.white]   # シミュレータの標準拡散反射板(brdf run --kind white で測られる)\n"
+          << "reflectance = " << num(c.sim.white_reflectance) << "\n";
 
         return o.str();
     }

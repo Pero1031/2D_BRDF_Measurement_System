@@ -27,7 +27,7 @@ namespace brdf::app {
 
     } // namespace
 
-    Result<Devices> makeDevices(const io::SetupConfig& setup) {
+    Result<Devices> makeDevices(const io::SetupConfig& setup, domain::MeasurementKind kind) {
         if (setup.mode == io::DeviceMode::Real) {
             return fail(ErrorCode::NotImplemented,
                         "devices.mode = \"real\" is not supported yet (real drivers are planned for P6); use \"sim\"");
@@ -46,7 +46,12 @@ namespace brdf::app {
         Devices d;
         d.left_arm = std::make_shared<sim::MockRobotArm>("LightArm", rig, sim::ArmSide::Left);
         d.right_arm = std::make_shared<sim::MockRobotArm>("SampleArm", rig, sim::ArmSide::Right);
-        auto imager = std::make_shared<sim::MockSpectralImager>(rig, makeBrdf(setup.sim.sample), setup.sim.imager);
+        // 白色板の測定では、試料の代わりに標準拡散反射板(完全拡散)を測る
+        std::shared_ptr<sim::IBrdfModel> target =
+            kind == domain::MeasurementKind::White
+                ? std::shared_ptr<sim::IBrdfModel>(std::make_shared<sim::LambertBrdf>(sim::flatCurve(setup.sim.white_reflectance)))
+                : makeBrdf(setup.sim.sample);
+        auto imager = std::make_shared<sim::MockSpectralImager>(rig, target, setup.sim.imager);
         auto mapping = setup.calibration.mapping();
         if (!mapping) return tl::unexpected(mapping.error());
         imager->setCalibrationBoard({setup.calibration.board, *mapping});

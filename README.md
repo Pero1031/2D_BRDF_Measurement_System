@@ -31,8 +31,8 @@ A detailed analysis of the previous system is in [docs/LegacySystemAnalysis.md](
 | P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`, mock arms and imager) | Done |
 | P3 | Project folders, TOML configuration, measurement session, CLI | Done |
 | P4 | Calibration board, homography, spot XML | Done |
-| P5 | Analysis (white-board normalization, BRDF reconstruction) | Next |
-| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
+| P5 | Analysis (white-plate normalization, BRDF) | Done |
+| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Next |
 | P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
 
 The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
@@ -52,6 +52,7 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A pre-flight check that finds joint-limit violations, arm collisions (including on the way to a pose) and spots whose light or camera is behind the surface, without moving anything
 - Import of the previous system's pose CSV (all 52 poses are accepted)
 - Calibration-board processing: circle-grid detection, a least-squares homography per pose, and SR-5000 spot definition files (XML). Checked against the previous system's real data: 13 images of 77 circles are detected and fitted, and the homographies agree with the saved ones to within 1 pixel at the paper corners; a previous spot XML is read and written back identically
+- Analysis: radiance factor = sample / white plate (the same poses), and the BRDF = factor × ρ / π. Optional correction for the different irradiance at the sample point and the white reference point, which removes the systematic error of the previous system (about ±11% in the simulator's default geometry). A round-trip test recovers the simulator's true glossy BRDF to 1e-4
 - A simulated camera board: the simulator draws the calibration board through its camera model, so `calibrate` → `run` can be tried end to end without hardware
 - The `brdf` command line: `init`, `check`, `run`, `angles`, `import-poses`
 
@@ -79,6 +80,7 @@ build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; typ
 | `brdf calibrate <dir>` | photograph the calibration board at every pose, detect the circles and save one homography per pose |
 | `brdf run <dir> [--kind sample\|white\|calib] [--yes]` | run the measurement and save the result under `result/<date>_<time>_<kind>/` |
 | `brdf angles <dir>` | write only the angles of every pose and spot |
+| `brdf analyze <dir> [--sample R] [--white R] [--irradiance-correction]` | compute the radiance factor and the BRDF from a sample run and a white-plate run |
 | `brdf spots <dir>` | write SR-5000 spot definition files (XML), one per pose, from the calibration |
 | `brdf import-poses <csv> [--out recipe.toml]` | build a recipe from the previous system's pose CSV |
 
@@ -91,11 +93,30 @@ my_measurement/
   calibration/
     images/<pose>.png    the calibration-board images
     homographies.csv     one homography per pose, with the reprojection error
+  result/<date>_<time>_analysis/
+    radiance_factor.csv  one row per (pose, spot): angles, then the radiance factor per wavelength
+    brdf.csv             the same, as BRDF [1/sr]
+    analysis_manifest.toml  which runs and which settings were used
   result/<date>_<time>_<kind>/
     measurements.csv     one row per (pose, spot): angles [deg] then the spectrum
     run_manifest.toml    when and how it was measured
     setup.toml, recipe.toml   copies of the settings used
 ```
+
+### Measuring the white plate and analysing
+
+The reflectance is the ratio of the sample's radiance to that of a standard white plate measured at the same poses:
+
+```bash
+build/Debug/brdf.exe run examples/sim_project --yes                # the sample
+build/Debug/brdf.exe run examples/sim_project --kind white --yes   # put the white plate on the arm first
+build/Debug/brdf.exe analyze examples/sim_project                  # the latest sample and white runs
+```
+
+- A white run measures only the reference point (sample coordinates (0, 0), the crosshair) at every pose; the plate is too small to cover the sample.
+- The two runs must have the same poses and the same rig layout (camera position and so on); `analyze` checks this and says what differs.
+- `analyze` uses the white-plate value at the reference point as the value of the whole pose, as the previous system did. Points away from the reference point are lit differently (the previous system's systematic error: too low far from the light, too high near it). `--irradiance-correction` (or `irradiance_correction = true` in `[analysis]`) divides it out, treating the light as a point source.
+- `[analysis]` in `setup.toml` also sets the plate's reflectance and the wavelength range. The LED is weak near 380 nm and 770 nm, so those wavelengths are unreliable.
 
 ### Using the calibration board
 

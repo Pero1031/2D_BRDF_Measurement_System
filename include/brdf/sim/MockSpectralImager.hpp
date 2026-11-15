@@ -38,7 +38,8 @@ namespace brdf::sim {
     /// 撮影のたびに、SimulatedRig から「いまの光源・試料・カメラの位置」を読み、点ごとに
     ///   1. 画像上の位置 → カメラの光線 → 試料面との交点
     ///   2. 交点での入射角・観察角(optics::computeAngles)
-    ///   3. 既知の BRDF モデル f と照度から、分光値  f · cosθi · I0 / d² · 積分時間
+    ///   3. 既知の BRDF モデル f と照度から、分光放射輝度  f · cosθi · I0 / d²
+    ///      (実機と同じく、校正済みの放射輝度を返す。積分時間を変えても値は変わらない)
     /// を計算する。実機と同じインターフェースなので、測定の流れ全体を実機なしで試せる。
     class MockSpectralImager : public driver::ISpectralImager {
     public:

@@ -105,6 +105,21 @@ namespace brdf::io {
         SimCameraConfig camera;
         sim::MockImagerOptions imager;
         SimSampleConfig sample;
+        Real white_reflectance = 0.99;   ///< シミュレータの標準拡散反射板の反射率(白色板の測定で使う)
+    };
+
+    /// 解析(brdf analyze)の設定。
+    struct AnalysisConfig {
+        /// 標準拡散反射板の反射率 ρ(全波長で一定とみなす)。BRDF = 放射輝度率 × ρ / π
+        Real white_reflectance = 0.99;
+
+        /// 出力する波長の範囲 [nm]。LED の出力が足りない 380 nm 付近と 770 nm 付近は信頼性が低いとされる。
+        Real min_wavelength_nm = 380.0;
+        Real max_wavelength_nm = 780.0;
+
+        /// 試料の測定点と反射板の基準点の照度の違い(点光源として cosθi / d²)を補正するか。
+        /// false は旧システムと同じ(クロスヘアの 1 点を、全測定点の代表値とする)。
+        bool irradiance_correction = false;
     };
 
     /// setup.toml の内容。旧システムでヘッダに直書きしていた装置の定数をここに集める。
@@ -114,6 +129,7 @@ namespace brdf::io {
         ImagerConfig imager;
         CalibrationConfig calibration;
         SpotXmlConfig spot_xml;
+        AnalysisConfig analysis;
         SimConfig sim;
     };
 
