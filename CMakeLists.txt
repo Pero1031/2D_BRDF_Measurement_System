@@ -20,6 +20,7 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(tl-expected CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
+find_package(OpenCV CONFIG REQUIRED)
 
 # ---------------------------------------------------------------------------
 # brdf_core: ライブラリ本体(計算・ドライバのインターフェース・モック)
@@ -44,6 +45,9 @@ add_library(brdf_core
     src/app/ResultFiles.cpp
     src/app/ProjectLayout.cpp
     src/app/Commands.cpp
+    src/calibration/BoardLayout.cpp
+    src/calibration/Homography.cpp
+    src/calibration/HomographySpotProjector.cpp
 )
 add_library(brdf::core ALIAS brdf_core)
 
@@ -60,10 +64,24 @@ target_link_libraries(brdf_core PUBLIC
 target_compile_definitions(brdf_core PUBLIC BRDF_VERSION="${PROJECT_VERSION}")
 
 # ---------------------------------------------------------------------------
+# brdf_vision: 画像処理(OpenCV を使う部分。公開ヘッダには OpenCV の型を出さない)
+# ---------------------------------------------------------------------------
+add_library(brdf_vision
+    src/vision/ImageIO.cpp
+    src/vision/HomographyFit.cpp
+    src/vision/CircleGridDetector.cpp
+)
+add_library(brdf::vision ALIAS brdf_vision)
+target_include_directories(brdf_vision PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_link_libraries(brdf_vision
+    PUBLIC brdf::core
+    PRIVATE opencv_core opencv_imgproc opencv_imgcodecs opencv_calib3d opencv_features2d)
+
+# ---------------------------------------------------------------------------
 # brdf: コマンドライン
 # ---------------------------------------------------------------------------
 add_executable(brdf src/cli/main.cpp)
-target_link_libraries(brdf PRIVATE brdf::core CLI11::CLI11)
+target_link_libraries(brdf PRIVATE brdf::core brdf::vision CLI11::CLI11)
 
 # ---------------------------------------------------------------------------
 # examples: モックだけで動くデモ

@@ -75,7 +75,7 @@ namespace brdf::app {
             request.integration_time_ms = recipe_.capture.integration_time_ms;
             request.wavelengths = recipe_.capture.wavelengths;
             for (const PatchAngles& p : patches) {
-                auto pixel = devices_.projector->pixelFor(p.world_point);
+                auto pixel = devices_.projector->pixelFor(SpotQuery{pose.id, p.sample_mm, p.world_point});
                 if (!pixel) {
                     return atPose(pose, "locating spot " + std::to_string(p.spot_id), pixel.error());
                 }

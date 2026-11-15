@@ -15,10 +15,11 @@ add_executable(brdf_tests
     test_preflight.cpp
     test_session.cpp
     test_commands.cpp
+    test_calibration.cpp
     test_headers.cpp
 )
 
-target_link_libraries(brdf_tests PRIVATE brdf::core Catch2::Catch2WithMain)
+target_link_libraries(brdf_tests PRIVATE brdf::core brdf::vision Catch2::Catch2WithMain)
 
 # 旧システムの出力から切り出した照合用データ(tests/data/)の場所をテストに教える
 target_compile_definitions(brdf_tests PRIVATE

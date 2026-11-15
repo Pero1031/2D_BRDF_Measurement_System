@@ -9,9 +9,9 @@
 
 namespace brdf::sim {
 
-    Result<Vec2> CameraSpotProjector::pixelFor(const Vec3& world_point) const {
+    Result<Vec2> CameraSpotProjector::pixelFor(const app::SpotQuery& query) const {
         const PinholeCamera& camera = rig_->camera();
-        const Vec2 pixel = camera.project(world_point);
+        const Vec2 pixel = camera.project(query.world_point);
 
         if (std::isnan(pixel.x()) || std::isnan(pixel.y())) {
             return fail(ErrorCode::OutOfRange, "the point is behind the camera");

@@ -18,7 +18,7 @@ namespace brdf::sim {
     public:
         explicit CameraSpotProjector(std::shared_ptr<const SimulatedRig> rig) : rig_(std::move(rig)) {}
 
-        Result<Vec2> pixelFor(const Vec3& world_point) const override;
+        Result<Vec2> pixelFor(const app::SpotQuery& query) const override;
 
     private:
         std::shared_ptr<const SimulatedRig> rig_;
