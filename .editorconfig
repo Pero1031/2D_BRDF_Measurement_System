@@ -1,0 +1,10 @@
+# Source files: UTF-8 with BOM (matches MSVC /utf-8)
+root = true
+
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = false
+
+[*.{json,md,yml,yaml}]
+charset = utf-8

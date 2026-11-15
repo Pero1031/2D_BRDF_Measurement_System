@@ -9,6 +9,7 @@
     "tomlplusplus",
     "opencv4",
     "cli11",
-    "tl-expected"
+    "tl-expected",
+    "catch2"
   ]
 }
