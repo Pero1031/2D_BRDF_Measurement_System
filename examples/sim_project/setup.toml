@@ -46,16 +46,20 @@ board_u = "+x"   # ボードを正面から見て右向きの軸は、試料座�
 board_v = "-y"   # 同、下向きの軸
 # sample_origin = [225.0, 151.0]   # 試料座標の原点がボード座標のどこか。省略すると紙の中心
 
-[spot_xml]   # brdf spots が作る、SR-5000 用のスポット定義ファイル
-binning = "BINNING_TYPE1"   # 分光放射計のビニング設定(レシピと合わせる)
+[imager]   # 2D 分光放射計。画像の大きさは機種とビニングで決まる
+device = "SR5100"   # "SR5100"(最新、2448x2048) または "SR5000"(1376x1024)
+binning = "BINNING_TYPE1"   # "BINNING_TYPE1" / "BINNING_TYPE2" / "BINNING_TYPE4"
+lens = "STANDARD"   # "WIDE" / "STANDARD" / "TELE" / "MACRO"
+# image_width = 2448   # 省略すると、機種とビニングから決まる
+# image_height = 2048
+
+[spot_xml]   # brdf spots が作る、スポット定義ファイル(ROI の大きさとビニングは [imager] の値)
 spot_size = 2.0   # 各スポットの一辺 [pixel]
 
 # ---- ここから下はシミュレーション(mode = "sim")のときだけ使う設定 ----
 
 [sim.camera]
-image_width = 1376
-image_height = 1024
-pixels_per_mm = 1.81
+pixels_per_mm = 3.22   # 注視点での解像度(画像の大きさは [imager])
 # target = [0.0, 0.0, 0.0]   # 省略すると、典型的な測定姿勢での試料位置を向く
 
 [sim.imager]

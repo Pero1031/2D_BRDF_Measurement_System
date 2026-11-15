@@ -36,17 +36,17 @@ namespace brdf::app {
         // カメラ: 位置は装置の配置から、向きは設定、無ければ既定
         const geometry::RigGeometry geometry(setup.rig);
         sim::PinholeCameraSetup camera = sim::SimulatedRig::defaultCamera(geometry);
-        camera.image_width = setup.camera.image_width;
-        camera.image_height = setup.camera.image_height;
-        camera.pixels_per_mm = setup.camera.pixels_per_mm;
-        if (setup.camera.target) camera.target = *setup.camera.target;
+        camera.image_width = setup.imager.width();
+        camera.image_height = setup.imager.height();
+        camera.pixels_per_mm = setup.sim.camera.pixels_per_mm;
+        if (setup.sim.camera.target) camera.target = *setup.sim.camera.target;
 
         auto rig = std::make_shared<sim::SimulatedRig>(setup.rig, camera);
 
         Devices d;
         d.left_arm = std::make_shared<sim::MockRobotArm>("LightArm", rig, sim::ArmSide::Left);
         d.right_arm = std::make_shared<sim::MockRobotArm>("SampleArm", rig, sim::ArmSide::Right);
-        auto imager = std::make_shared<sim::MockSpectralImager>(rig, makeBrdf(setup.sample), setup.imager);
+        auto imager = std::make_shared<sim::MockSpectralImager>(rig, makeBrdf(setup.sim.sample), setup.sim.imager);
         auto mapping = setup.calibration.mapping();
         if (!mapping) return tl::unexpected(mapping.error());
         imager->setCalibrationBoard({setup.calibration.board, *mapping});

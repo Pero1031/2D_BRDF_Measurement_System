@@ -23,11 +23,32 @@ namespace brdf::io {
 
     inline const char* toString(DeviceMode mode) { return mode == DeviceMode::Sim ? "sim" : "real"; }
 
-    /// シミュレーションのカメラ。
+    /// 2D 分光放射計の機種と撮影設定。実機でもシミュレータでも使う(画像の大きさは機種で決まるため)。
+    ///
+    /// 機種ごとの画像の大きさ(ビニング 1): SR-5100 は 2448×2048、SR-5000 は 1376×1024。
+    /// 旧システムのレシピでは、2023-06-20 までが SR5000、2023-06-21 以降が SR5100 だった。
+    struct ImagerConfig {
+        std::string device = "SR5100";           ///< "SR5100"(最新)または "SR5000"
+        std::string binning = "BINNING_TYPE1";   ///< "BINNING_TYPE1" / "BINNING_TYPE2" / "BINNING_TYPE4"(SDK と同じ名前)
+        std::string lens = "STANDARD";           ///< "WIDE" / "STANDARD" / "TELE" / "MACRO"
+
+        /// 画像の大きさ [pixel]。省略すると、機種とビニングから決まる。
+        std::optional<int> image_width;
+        std::optional<int> image_height;
+
+        int binningFactor() const { return binning == "BINNING_TYPE4" ? 4 : (binning == "BINNING_TYPE2" ? 2 : 1); }
+        int sensorWidth() const { return device == "SR5000" ? 1376 : 2448; }
+        int sensorHeight() const { return device == "SR5000" ? 1024 : 2048; }
+
+        int width() const { return image_width ? *image_width : sensorWidth() / binningFactor(); }
+        int height() const { return image_height ? *image_height : sensorHeight() / binningFactor(); }
+    };
+
+    /// シミュレーションのカメラ(物理的なカメラモデル)。画像の大きさは ImagerConfig で決まる。
     struct SimCameraConfig {
-        int image_width = 1376;
-        int image_height = 1024;
-        Real pixels_per_mm = 1.81;
+        /// 注視点での画像の解像度 [pixel/mm]。既定値は、旧システムの 1.81(SR-5000、1376 pixel)を
+        /// SR-5100 の画素数(2448 pixel)に換算したもの。同じ視野になる。
+        Real pixels_per_mm = 3.22;
         std::optional<Vec3> target;   ///< 省略すると、典型的な測定姿勢での試料位置を向く
     };
 
@@ -73,21 +94,27 @@ namespace brdf::io {
         }
     };
 
-    /// スポット定義ファイル(SR-5000 のソフトに読み込ませる XML)の設定。
+    /// スポット定義ファイル(SR-5000/5100 のソフトに読み込ませる XML)の設定。
+    /// ROI の大きさとビニングは [imager] の値を使う。
     struct SpotXmlConfig {
-        std::string binning = "BINNING_TYPE1";   ///< 分光放射計のビニング設定(レシピと合わせる)
         Real spot_size = 2.0;                    ///< 各スポットの一辺 [pixel]
+    };
+
+    /// シミュレーションだけで使う設定。
+    struct SimConfig {
+        SimCameraConfig camera;
+        sim::MockImagerOptions imager;
+        SimSampleConfig sample;
     };
 
     /// setup.toml の内容。旧システムでヘッダに直書きしていた装置の定数をここに集める。
     struct SetupConfig {
         DeviceMode mode = DeviceMode::Sim;
         geometry::RigSetup rig;
-        SimCameraConfig camera;
+        ImagerConfig imager;
         CalibrationConfig calibration;
         SpotXmlConfig spot_xml;
-        sim::MockImagerOptions imager;
-        SimSampleConfig sample;
+        SimConfig sim;
     };
 
     /// TOML の文字列から読む。origin はエラーメッセージに出すファイル名。

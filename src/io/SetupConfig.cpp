@@ -46,11 +46,25 @@ namespace brdf::io {
             if (c.rig.sample_surface_offset < 0.0) {
                 return fail(ErrorCode::InvalidArgument, "setup: [rig] sample_surface_offset must not be negative");
             }
-            if (c.camera.image_width <= 0 || c.camera.image_height <= 0 || !positive(c.camera.pixels_per_mm)) {
-                return fail(ErrorCode::InvalidArgument,
-                            "setup: [sim.camera] image_width, image_height and pixels_per_mm must be positive");
+            const auto& im = c.imager;
+            if (im.device != "SR5100" && im.device != "SR5000") {
+                return fail(ErrorCode::InvalidArgument, "setup: [imager] device must be \"SR5100\" or \"SR5000\"");
             }
-            if (!positive(c.imager.light_intensity) || !positive(c.imager.focus_tolerance_mm) || c.imager.noise_relative < 0.0) {
+            if (im.binning != "BINNING_TYPE1" && im.binning != "BINNING_TYPE2" && im.binning != "BINNING_TYPE4") {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [imager] binning must be \"BINNING_TYPE1\", \"BINNING_TYPE2\" or \"BINNING_TYPE4\"");
+            }
+            if (im.lens != "WIDE" && im.lens != "STANDARD" && im.lens != "TELE" && im.lens != "MACRO") {
+                return fail(ErrorCode::InvalidArgument, "setup: [imager] lens must be \"WIDE\", \"STANDARD\", \"TELE\" or \"MACRO\"");
+            }
+            if (im.width() <= 0 || im.height() <= 0) {
+                return fail(ErrorCode::InvalidArgument, "setup: [imager] image_width and image_height must be positive");
+            }
+            if (!positive(c.sim.camera.pixels_per_mm)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [sim.camera] pixels_per_mm must be positive");
+            }
+            if (!positive(c.sim.imager.light_intensity) || !positive(c.sim.imager.focus_tolerance_mm)
+                || c.sim.imager.noise_relative < 0.0) {
                 return fail(ErrorCode::InvalidArgument,
                             "setup: [sim.imager] light_intensity and focus_tolerance_mm must be positive, noise_relative must not be negative");
             }
@@ -87,13 +101,13 @@ namespace brdf::io {
             if (auto m = cal.mapping(); !m) {
                 return fail(ErrorCode::InvalidArgument, "setup: [calibration.board] " + m.error().message);
             }
-            if (c.spot_xml.binning.empty() || !positive(c.spot_xml.spot_size)) {
-                return fail(ErrorCode::InvalidArgument, "setup: [spot_xml] binning must not be empty and spot_size must be positive");
+            if (!positive(c.spot_xml.spot_size)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [spot_xml] spot_size must be positive");
             }
-            if (c.sample.model != "lambert" && c.sample.model != "phong") {
+            if (c.sim.sample.model != "lambert" && c.sim.sample.model != "phong") {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.sample] model must be \"lambert\" or \"phong\"");
             }
-            if (!positive(c.sample.width_nm) || !positive(c.sample.shininess)) {
+            if (!positive(c.sim.sample.width_nm) || !positive(c.sim.sample.shininess)) {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.sample] width_nm and shininess must be positive");
             }
             return {};
@@ -190,11 +204,30 @@ namespace brdf::io {
             BRDF_TRY(cal->finish());
         }
 
+        // --- [imager] ---
+        {
+            auto s = top.child("imager");
+            if (!s) return tl::unexpected(s.error());
+            BRDF_TRY(s->string("device", c.imager.device));
+            BRDF_TRY(s->string("binning", c.imager.binning));
+            BRDF_TRY(s->string("lens", c.imager.lens));
+            if (s->has("image_width")) {
+                int v = 0;
+                BRDF_TRY(s->integer("image_width", v));
+                c.imager.image_width = v;
+            }
+            if (s->has("image_height")) {
+                int v = 0;
+                BRDF_TRY(s->integer("image_height", v));
+                c.imager.image_height = v;
+            }
+            BRDF_TRY(s->finish());
+        }
+
         // --- [spot_xml] ---
         {
             auto s = top.child("spot_xml");
             if (!s) return tl::unexpected(s.error());
-            BRDF_TRY(s->string("binning", c.spot_xml.binning));
             BRDF_TRY(s->number("spot_size", c.spot_xml.spot_size));
             BRDF_TRY(s->finish());
         }
@@ -206,35 +239,35 @@ namespace brdf::io {
 
             auto camera = sim->child("camera");
             if (!camera) return tl::unexpected(camera.error());
-            BRDF_TRY(camera->integer("image_width", c.camera.image_width));
-            BRDF_TRY(camera->integer("image_height", c.camera.image_height));
-            BRDF_TRY(camera->number("pixels_per_mm", c.camera.pixels_per_mm));
+            BRDF_TRY(camera->number("pixels_per_mm", c.sim.camera.pixels_per_mm));
             if (camera->has("target")) {
                 Vec3 target = Vec3::Zero();
                 BRDF_TRY(camera->vec3("target", target));
-                c.camera.target = target;
+                c.sim.camera.target = target;
             }
             BRDF_TRY(camera->finish());
 
             auto imager = sim->child("imager");
             if (!imager) return tl::unexpected(imager.error());
-            BRDF_TRY(imager->number("light_intensity", c.imager.light_intensity));
-            BRDF_TRY(imager->number("noise_relative", c.imager.noise_relative));
-            int seed = static_cast<int>(c.imager.seed);
+            auto& si = c.sim.imager;
+            BRDF_TRY(imager->number("light_intensity", si.light_intensity));
+            BRDF_TRY(imager->number("noise_relative", si.noise_relative));
+            int seed = static_cast<int>(si.seed);
             BRDF_TRY(imager->integer("seed", seed));
-            c.imager.seed = static_cast<std::uint32_t>(seed);
-            BRDF_TRY(imager->number("focus_tolerance_mm", c.imager.focus_tolerance_mm));
+            si.seed = static_cast<std::uint32_t>(seed);
+            BRDF_TRY(imager->number("focus_tolerance_mm", si.focus_tolerance_mm));
             BRDF_TRY(imager->finish());
 
             auto sample = sim->child("sample");
             if (!sample) return tl::unexpected(sample.error());
-            BRDF_TRY(sample->string("model", c.sample.model));
-            BRDF_TRY(sample->number("peak_nm", c.sample.peak_nm));
-            BRDF_TRY(sample->number("width_nm", c.sample.width_nm));
-            BRDF_TRY(sample->number("peak", c.sample.peak));
-            BRDF_TRY(sample->number("base", c.sample.base));
-            BRDF_TRY(sample->number("specular", c.sample.specular));
-            BRDF_TRY(sample->number("shininess", c.sample.shininess));
+            auto& ss = c.sim.sample;
+            BRDF_TRY(sample->string("model", ss.model));
+            BRDF_TRY(sample->number("peak_nm", ss.peak_nm));
+            BRDF_TRY(sample->number("width_nm", ss.width_nm));
+            BRDF_TRY(sample->number("peak", ss.peak));
+            BRDF_TRY(sample->number("base", ss.base));
+            BRDF_TRY(sample->number("specular", ss.specular));
+            BRDF_TRY(sample->number("shininess", ss.shininess));
             BRDF_TRY(sample->finish());
 
             BRDF_TRY(sim->finish());
@@ -323,37 +356,44 @@ namespace brdf::io {
         }
         o << "\n";
 
-        o << "[spot_xml]   # brdf spots が作る、SR-5000 用のスポット定義ファイル\n"
-          << "binning = " << quote(c.spot_xml.binning) << "   # 分光放射計のビニング設定(レシピと合わせる)\n"
+        o << "[imager]   # 2D 分光放射計。画像の大きさは機種とビニングで決まる\n"
+          << "device = " << quote(c.imager.device) << "   # \"SR5100\"(最新、2448x2048) または \"SR5000\"(1376x1024)\n"
+          << "binning = " << quote(c.imager.binning) << "   # \"BINNING_TYPE1\" / \"BINNING_TYPE2\" / \"BINNING_TYPE4\"\n"
+          << "lens = " << quote(c.imager.lens) << "   # \"WIDE\" / \"STANDARD\" / \"TELE\" / \"MACRO\"\n";
+        if (c.imager.image_width) o << "image_width = " << *c.imager.image_width << "\n";
+        else o << "# image_width = " << c.imager.width() << "   # 省略すると、機種とビニングから決まる\n";
+        if (c.imager.image_height) o << "image_height = " << *c.imager.image_height << "\n";
+        else o << "# image_height = " << c.imager.height() << "\n";
+        o << "\n";
+
+        o << "[spot_xml]   # brdf spots が作る、スポット定義ファイル(ROI の大きさとビニングは [imager] の値)\n"
           << "spot_size = " << num(c.spot_xml.spot_size) << "   # 各スポットの一辺 [pixel]\n\n";
 
         o << "# ---- ここから下はシミュレーション(mode = \"sim\")のときだけ使う設定 ----\n\n";
 
         o << "[sim.camera]\n"
-          << "image_width = " << c.camera.image_width << "\n"
-          << "image_height = " << c.camera.image_height << "\n"
-          << "pixels_per_mm = " << num(c.camera.pixels_per_mm) << "\n";
-        if (c.camera.target) {
-            o << "target = " << arr3(*c.camera.target) << "\n";
+          << "pixels_per_mm = " << num(c.sim.camera.pixels_per_mm) << "   # 注視点での解像度(画像の大きさは [imager])\n";
+        if (c.sim.camera.target) {
+            o << "target = " << arr3(*c.sim.camera.target) << "\n";
         } else {
             o << "# target = [0.0, 0.0, 0.0]   # 省略すると、典型的な測定姿勢での試料位置を向く\n";
         }
         o << "\n";
 
         o << "[sim.imager]\n"
-          << "light_intensity = " << num(c.imager.light_intensity) << "\n"
-          << "noise_relative = " << num(c.imager.noise_relative) << "   # 0 ならノイズなし\n"
-          << "seed = " << c.imager.seed << "\n"
-          << "focus_tolerance_mm = " << num(c.imager.focus_tolerance_mm) << "\n\n";
+          << "light_intensity = " << num(c.sim.imager.light_intensity) << "\n"
+          << "noise_relative = " << num(c.sim.imager.noise_relative) << "   # 0 ならノイズなし\n"
+          << "seed = " << c.sim.imager.seed << "\n"
+          << "focus_tolerance_mm = " << num(c.sim.imager.focus_tolerance_mm) << "\n\n";
 
         o << "[sim.sample]   # シミュレーションで測られる試料\n"
-          << "model = " << quote(c.sample.model) << "   # \"lambert\" または \"phong\"\n"
-          << "peak_nm = " << num(c.sample.peak_nm) << "\n"
-          << "width_nm = " << num(c.sample.width_nm) << "\n"
-          << "peak = " << num(c.sample.peak) << "\n"
-          << "base = " << num(c.sample.base) << "\n"
-          << "specular = " << num(c.sample.specular) << "   # phong のみ\n"
-          << "shininess = " << num(c.sample.shininess) << "   # phong のみ\n";
+          << "model = " << quote(c.sim.sample.model) << "   # \"lambert\" または \"phong\"\n"
+          << "peak_nm = " << num(c.sim.sample.peak_nm) << "\n"
+          << "width_nm = " << num(c.sim.sample.width_nm) << "\n"
+          << "peak = " << num(c.sim.sample.peak) << "\n"
+          << "base = " << num(c.sim.sample.base) << "\n"
+          << "specular = " << num(c.sim.sample.specular) << "   # phong のみ\n"
+          << "shininess = " << num(c.sim.sample.shininess) << "   # phong のみ\n";
 
         return o.str();
     }

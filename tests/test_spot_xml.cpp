@@ -137,6 +137,12 @@ TEST_CASE("brdf spots writes one definition file per pose from the calibration",
     const fs::path dir = tmp.path / "p";
     REQUIRE(app::initProject(dir).has_value());
 
+    // テストを速くするため、画像を小さく(688x512)する。円は少し大きく(直径 20 mm)して、検出を安定させる。
+    replaceInFile(dir / "setup.toml", "# image_width = 2448", "image_width = 688");
+    replaceInFile(dir / "setup.toml", "# image_height = 2048", "image_height = 512");
+    replaceInFile(dir / "setup.toml", "pixels_per_mm = 3.22", "pixels_per_mm = 0.9");
+    replaceInFile(dir / "setup.toml", "circle_diameter = 16.0", "circle_diameter = 20.0");
+
     SECTION("it needs the calibration-board projector") {
         const auto r = app::exportSpots(dir, "20260101_120000");
         REQUIRE_FALSE(r.has_value());
@@ -156,16 +162,16 @@ TEST_CASE("brdf spots writes one definition file per pose from the calibration",
             REQUIRE(fs::exists(f));
             const std::string xml = readFile(f);
             CHECK_THAT(xml, ContainsSubstring("datetime=\"2026/01/01 12:00:00.000\""));
-            CHECK_THAT(xml, ContainsSubstring("<MeasurementRoi x=\"0\" y=\"0\" width=\"1376\" height=\"1024\"/>"));
+            CHECK_THAT(xml, ContainsSubstring("<MeasurementRoi x=\"0\" y=\"0\" width=\"688\" height=\"512\"/>"));
 
             const auto spots = parseSpotXml(xml);
             REQUIRE(spots.has_value());
             CHECK(spots->size() == 9);   // 3×3 の測定点
             for (const auto& s : *spots) {
                 CHECK(s.pixel.x() >= 0.0);
-                CHECK(s.pixel.x() < 1376.0);
+                CHECK(s.pixel.x() < 688.0);
                 CHECK(s.pixel.y() >= 0.0);
-                CHECK(s.pixel.y() < 1024.0);
+                CHECK(s.pixel.y() < 512.0);
             }
         }
     }

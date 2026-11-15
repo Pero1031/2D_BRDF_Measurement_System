@@ -65,9 +65,9 @@ namespace {
     fs::path makeSmallProject(const fs::path& base) {
         const fs::path dir = base / "p";
         REQUIRE(initProject(dir).has_value());
-        replaceInFile(dir / "setup.toml", "image_width = 1376", "image_width = 688");
-        replaceInFile(dir / "setup.toml", "image_height = 1024", "image_height = 512");
-        replaceInFile(dir / "setup.toml", "pixels_per_mm = 1.81", "pixels_per_mm = 0.9");
+        replaceInFile(dir / "setup.toml", "# image_width = 2448", "image_width = 688");
+        replaceInFile(dir / "setup.toml", "# image_height = 2048", "image_height = 512");
+        replaceInFile(dir / "setup.toml", "pixels_per_mm = 3.22", "pixels_per_mm = 0.9");
         replaceInFile(dir / "setup.toml", "circle_diameter = 16.0", "circle_diameter = 20.0");
         return dir;
     }

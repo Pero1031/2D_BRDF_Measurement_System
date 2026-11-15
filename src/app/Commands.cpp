@@ -52,7 +52,7 @@ namespace brdf::app {
             auto mapping = project.setup.calibration.mapping();
             if (!mapping) return tl::unexpected(mapping.error());
             auto projector = std::make_shared<calibration::HomographySpotProjector>(
-                *mapping, project.setup.camera.image_width, project.setup.camera.image_height);
+                *mapping, project.setup.imager.width(), project.setup.imager.height());
             for (const io::PoseCalibration& c : *loaded) projector->setHomography(c.pose_id, c.homography);
 
             std::string missing;
@@ -295,9 +295,9 @@ namespace brdf::app {
         }
 
         io::SpotXmlSettings settings;
-        settings.roi_width = loaded->setup.camera.image_width;
-        settings.roi_height = loaded->setup.camera.image_height;
-        settings.binning = loaded->setup.spot_xml.binning;
+        settings.roi_width = loaded->setup.imager.width();
+        settings.roi_height = loaded->setup.imager.height();
+        settings.binning = loaded->setup.imager.binning;
         settings.spot_size = loaded->setup.spot_xml.spot_size;
         settings.datetime = io::spotXmlDatetime(stamp);
 

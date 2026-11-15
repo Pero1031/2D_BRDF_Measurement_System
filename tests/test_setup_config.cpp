@@ -32,15 +32,19 @@ namespace {
         CHECK_THAT(a.rig.links.elbow_fixed_angle, WithinAbs(b.rig.links.elbow_fixed_angle, 1e-9));
         CHECK_THAT((a.rig.joint_limits.lower - b.rig.joint_limits.lower).norm(), WithinAbs(0.0, 1e-9));
         CHECK_THAT((a.rig.joint_limits.upper - b.rig.joint_limits.upper).norm(), WithinAbs(0.0, 1e-9));
-        CHECK(a.camera.image_width == b.camera.image_width);
-        CHECK(a.camera.image_height == b.camera.image_height);
-        CHECK_THAT(a.camera.pixels_per_mm, WithinAbs(b.camera.pixels_per_mm, 1e-9));
-        REQUIRE(a.camera.target.has_value() == b.camera.target.has_value());
-        if (a.camera.target) checkVec(*a.camera.target, *b.camera.target);
-        CHECK_THAT(a.imager.light_intensity, WithinAbs(b.imager.light_intensity, 1e-6));
-        CHECK_THAT(a.imager.noise_relative, WithinAbs(b.imager.noise_relative, 1e-12));
-        CHECK(a.imager.seed == b.imager.seed);
-        CHECK_THAT(a.imager.focus_tolerance_mm, WithinAbs(b.imager.focus_tolerance_mm, 1e-9));
+        CHECK(a.imager.device == b.imager.device);
+        CHECK(a.imager.binning == b.imager.binning);
+        CHECK(a.imager.lens == b.imager.lens);
+        CHECK(a.imager.width() == b.imager.width());
+        CHECK(a.imager.height() == b.imager.height());
+        CHECK_THAT(a.spot_xml.spot_size, WithinAbs(b.spot_xml.spot_size, 1e-12));
+        CHECK_THAT(a.sim.camera.pixels_per_mm, WithinAbs(b.sim.camera.pixels_per_mm, 1e-9));
+        REQUIRE(a.sim.camera.target.has_value() == b.sim.camera.target.has_value());
+        if (a.sim.camera.target) checkVec(*a.sim.camera.target, *b.sim.camera.target);
+        CHECK_THAT(a.sim.imager.light_intensity, WithinAbs(b.sim.imager.light_intensity, 1e-6));
+        CHECK_THAT(a.sim.imager.noise_relative, WithinAbs(b.sim.imager.noise_relative, 1e-12));
+        CHECK(a.sim.imager.seed == b.sim.imager.seed);
+        CHECK_THAT(a.sim.imager.focus_tolerance_mm, WithinAbs(b.sim.imager.focus_tolerance_mm, 1e-9));
         CHECK(a.calibration.projector == b.calibration.projector);
         CHECK_THAT(a.calibration.max_rms_px, WithinAbs(b.calibration.max_rms_px, 1e-12));
         CHECK(a.calibration.board.columns == b.calibration.board.columns);
@@ -51,11 +55,11 @@ namespace {
         CHECK_THAT((a.calibration.sampleOrigin() - b.calibration.sampleOrigin()).norm(), WithinAbs(0.0, 1e-12));
         CHECK(a.calibration.board_u == b.calibration.board_u);
         CHECK(a.calibration.board_v == b.calibration.board_v);
-        CHECK(a.sample.model == b.sample.model);
-        CHECK_THAT(a.sample.peak_nm, WithinAbs(b.sample.peak_nm, 1e-9));
-        CHECK_THAT(a.sample.width_nm, WithinAbs(b.sample.width_nm, 1e-9));
-        CHECK_THAT(a.sample.specular, WithinAbs(b.sample.specular, 1e-9));
-        CHECK_THAT(a.sample.shininess, WithinAbs(b.sample.shininess, 1e-9));
+        CHECK(a.sim.sample.model == b.sim.sample.model);
+        CHECK_THAT(a.sim.sample.peak_nm, WithinAbs(b.sim.sample.peak_nm, 1e-9));
+        CHECK_THAT(a.sim.sample.width_nm, WithinAbs(b.sim.sample.width_nm, 1e-9));
+        CHECK_THAT(a.sim.sample.specular, WithinAbs(b.sim.sample.specular, 1e-9));
+        CHECK_THAT(a.sim.sample.shininess, WithinAbs(b.sim.sample.shininess, 1e-9));
     }
 
     std::string errorOf(const std::string& toml) {
@@ -87,12 +91,16 @@ TEST_CASE("a modified setup survives a write/read round trip", "[config]") {
     c.rig.right_base_position = Vec3(10, 950, -5);
     c.rig.arm_radius = 55.5;
     c.rig.joint_limits.upper(2) = toRadians(150.0);
-    c.camera.target = Vec3(100, 200, 300);
-    c.camera.image_width = 640;
-    c.imager.noise_relative = 0.02;
-    c.imager.seed = 99;
-    c.sample.model = "phong";
-    c.sample.shininess = 120.0;
+    c.sim.camera.target = Vec3(100, 200, 300);
+    c.imager.device = "SR5000";
+    c.imager.binning = "BINNING_TYPE2";
+    c.imager.lens = "WIDE";
+    c.imager.image_width = 640;
+    c.spot_xml.spot_size = 3.0;
+    c.sim.imager.noise_relative = 0.02;
+    c.sim.imager.seed = 99;
+    c.sim.sample.model = "phong";
+    c.sim.sample.shininess = 120.0;
 
     const auto parsed = parseSetup(toToml(c));
     REQUIRE(parsed.has_value());
@@ -145,7 +153,8 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
     SECTION("non-positive values") {
         CHECK_THAT(errorOf("[arm]\nradius_mm = -1\n"), ContainsSubstring("radius_mm"));
         CHECK_THAT(errorOf("[arm.links]\nwrist = 0\n"), ContainsSubstring("link length"));
-        CHECK_THAT(errorOf("[sim.camera]\nimage_width = 0\n"), ContainsSubstring("image_width"));
+        CHECK_THAT(errorOf("[imager]\nimage_width = 0\n"), ContainsSubstring("image_width"));
+        CHECK_THAT(errorOf("[sim.camera]\npixels_per_mm = 0\n"), ContainsSubstring("pixels_per_mm"));
     }
     SECTION("calibration settings") {
         CHECK_THAT(errorOf("[calibration]\nprojector = \"magic\"\n"), ContainsSubstring("camera-model"));
@@ -158,6 +167,12 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
         CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"up\"\n"), ContainsSubstring("board_u"));
         CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"+x\"\nboard_v = \"-x\"\n"), ContainsSubstring("different axes"));
     }
+    SECTION("imager settings") {
+        CHECK_THAT(errorOf("[imager]\ndevice = \"SR9000\"\n"), ContainsSubstring("SR5100"));
+        CHECK_THAT(errorOf("[imager]\nbinning = \"2\"\n"), ContainsSubstring("BINNING_TYPE1"));
+        CHECK_THAT(errorOf("[imager]\nlens = \"zoom\"\n"), ContainsSubstring("STANDARD"));
+        CHECK_THAT(errorOf("[spot_xml]\nbinning = \"BINNING_TYPE1\"\n"), ContainsSubstring("unknown key 'binning'"));
+    }
     SECTION("unknown sample model") {
         CHECK_THAT(errorOf("[sim.sample]\nmodel = \"mirror\"\n"), ContainsSubstring("lambert"));
     }
@@ -167,4 +182,46 @@ TEST_CASE("loadSetup reports a missing file", "[config]") {
     const auto r = loadSetup("this/file/does/not/exist/setup.toml");
     REQUIRE_FALSE(r.has_value());
     CHECK_THAT(r.error().message, ContainsSubstring("cannot open"));
+}
+
+TEST_CASE("the image size follows the imager model and the binning", "[config][imager]") {
+    SECTION("the default is the newest instrument, SR-5100") {
+        const SetupConfig c;
+        CHECK(c.imager.device == "SR5100");
+        CHECK(c.imager.width() == 2448);
+        CHECK(c.imager.height() == 2048);
+    }
+    SECTION("SR-5000 and the binning types") {
+        SetupConfig c;
+        c.imager.device = "SR5000";
+        CHECK(c.imager.width() == 1376);
+        CHECK(c.imager.height() == 1024);
+        c.imager.binning = "BINNING_TYPE2";
+        CHECK(c.imager.width() == 688);
+        c.imager.device = "SR5100";
+        CHECK(c.imager.width() == 1224);
+        CHECK(c.imager.height() == 1024);
+        c.imager.binning = "BINNING_TYPE4";
+        CHECK(c.imager.width() == 612);
+    }
+    SECTION("an explicit size wins, and the size is read from the file") {
+        const auto parsed = parseSetup("[imager]\ndevice = \"SR5000\"\nimage_width = 1000\n");
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->imager.width() == 1000);
+        CHECK(parsed->imager.height() == 1024);   // 省略した方は機種から
+    }
+    SECTION("changing the device in the file changes the derived size (the template writes the size only as a comment)") {
+        const auto parsed = parseSetup(toToml(SetupConfig{}) + "");
+        REQUIRE(parsed.has_value());
+        CHECK(parsed->imager.width() == 2448);
+
+        std::string text = toToml(SetupConfig{});
+        const auto pos = text.find("device = \"SR5100\"");
+        REQUIRE(pos != std::string::npos);
+        text.replace(pos, std::string("device = \"SR5100\"").size(), "device = \"SR5000\"");
+        const auto changed = parseSetup(text);
+        REQUIRE(changed.has_value());
+        CHECK(changed->imager.width() == 1376);
+        CHECK(changed->imager.height() == 1024);
+    }
 }
