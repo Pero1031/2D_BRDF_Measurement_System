@@ -53,6 +53,7 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - Import of the previous system's pose CSV (all 52 poses are accepted)
 - Calibration-board processing: circle-grid detection, a least-squares homography per pose, and SR-5000 spot definition files (XML). Checked against the previous system's real data: 13 images of 77 circles are detected and fitted, and the homographies agree with the saved ones to within 1 pixel at the paper corners; a previous spot XML is read and written back identically
 - Analysis: radiance factor = sample / white plate (the same poses), and the BRDF = factor × ρ / π. Optional correction for the different irradiance at the sample point and the white reference point, which removes the systematic error of the previous system (about ±11% in the simulator's default geometry). A round-trip test recovers the simulator's true glossy BRDF to 1e-4
+- A 3D animation of the arm motion (`brdf view`): one self-contained HTML file that opens in any browser, offline. Shows both arms, the light, the sample plate, the camera and its field of view, the spots and the light / viewing directions; play, step, jump to a pose, rotate the view; joint angles, the distance between the arms and the spot angles; arms turn red when they get too close, including *while moving between poses*
 - A simulated camera board: the simulator draws the calibration board through its camera model, so `calibrate` → `run` can be tried end to end without hardware
 - The `brdf` command line: `init`, `check`, `run`, `angles`, `import-poses`
 
@@ -81,6 +82,7 @@ build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; typ
 | `brdf run <dir> [--kind sample\|white\|calib] [--yes]` | run the measurement and save the result under `result/<date>_<time>_<kind>/` |
 | `brdf angles <dir>` | write only the angles of every pose and spot |
 | `brdf analyze <dir> [--sample R] [--white R] [--irradiance-correction]` | compute the radiance factor and the BRDF from a sample run and a white-plate run |
+| `brdf view <dir> [--steps N]` | export the poses as a 3D animation (one HTML file) under `result/<date>_<time>_view/` |
 | `brdf spots <dir>` | write SR-5000 spot definition files (XML), one per pose, from the calibration |
 | `brdf import-poses <csv> [--out recipe.toml]` | build a recipe from the previous system's pose CSV |
 
@@ -102,6 +104,15 @@ my_measurement/
     run_manifest.toml    when and how it was measured
     setup.toml, recipe.toml   copies of the settings used
 ```
+
+### Watching the arms move
+
+```bash
+build/Debug/brdf.exe view examples/sim_project     # then open result/<date>_<time>_view/view.html in a browser
+```
+
+The animation follows the order the session uses: from the previous pose, the left arm moves first, then the right arm, with the joint angles interpolated linearly (as the controller's joint move does). Drag to rotate, wheel to zoom, Shift + drag to pan. The arms are drawn as thick sticks (a simplified model, not the real outline).
+Use it before a real measurement to see where the arms and the light go; the pre-flight findings of `brdf check` are shown for each pose.
 
 ### Measuring the white plate and analysing
 

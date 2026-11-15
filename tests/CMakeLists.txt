@@ -19,6 +19,7 @@ add_executable(brdf_tests
     test_calibrate.cpp
     test_spot_xml.cpp
     test_analysis.cpp
+    test_view.cpp
     test_analyze_command.cpp
     test_headers.cpp
 )

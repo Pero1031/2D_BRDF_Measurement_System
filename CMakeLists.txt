@@ -23,6 +23,23 @@ find_package(CLI11 CONFIG REQUIRED)
 find_package(OpenCV CONFIG REQUIRED)
 
 # ---------------------------------------------------------------------------
+# resources/view_template.html を、C++ のバイト配列として埋め込む(動作シミュレーションの HTML のひな型)
+# ---------------------------------------------------------------------------
+set(VIEW_TEMPLATE ${CMAKE_CURRENT_SOURCE_DIR}/resources/view_template.html)
+file(READ ${VIEW_TEMPLATE} VIEW_TEMPLATE_HEX HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," VIEW_TEMPLATE_BYTES "${VIEW_TEMPLATE_HEX}")
+string(LENGTH "${VIEW_TEMPLATE_HEX}" VIEW_TEMPLATE_HEX_LENGTH)
+math(EXPR VIEW_TEMPLATE_SIZE "${VIEW_TEMPLATE_HEX_LENGTH} / 2")
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/generated/ViewTemplate.cpp
+"#include <cstddef>
+namespace brdf::app::detail {
+    extern const unsigned char kViewTemplateBytes[] = {${VIEW_TEMPLATE_BYTES}0x00};
+    extern const std::size_t kViewTemplateSize = ${VIEW_TEMPLATE_SIZE};
+}
+")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${VIEW_TEMPLATE})
+
+# ---------------------------------------------------------------------------
 # brdf_core: ライブラリ本体(計算・ドライバのインターフェース・モック)
 # ---------------------------------------------------------------------------
 add_library(brdf_core
@@ -43,6 +60,8 @@ add_library(brdf_core
     src/io/MeasurementsCsv.cpp
     src/analysis/RadianceFactor.cpp
     src/app/Analyze.cpp
+    src/app/ViewExport.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/ViewTemplate.cpp
     src/app/AngleTable.cpp
     src/app/Preflight.cpp
     src/app/MeasurementSession.cpp

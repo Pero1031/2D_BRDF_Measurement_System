@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BRDF 測定システム 動作シミュレーション</title>
+<style>
+  :root {
+    --bg: #0f1419; --panel: #171e26; --line: #2a3441; --text: #e6edf3; --muted: #8b98a5;
+    --left: #4c9aff; --right: #ff9f43; --ok: #3ecf8e; --warn: #f5c542; --bad: #ff5c5c; --accent: #7aa2f7;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f4f6f8; --panel: #ffffff; --line: #d5dce3; --text: #1a2330; --muted: #5d6b7a; --left: #1d6fe0; --right: #e0750b; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.5 "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif; }
+  #app { display: flex; height: 100%; }
+  #stage { flex: 1 1 auto; position: relative; min-width: 0; }
+  canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  canvas.drag { cursor: grabbing; }
+  #hud { position: absolute; left: 12px; top: 10px; pointer-events: none; font-size: 13px; color: var(--muted); }
+  #hud b { color: var(--text); }
+  #side { flex: 0 0 340px; max-width: 42vw; background: var(--panel); border-left: 1px solid var(--line);
+    overflow-y: auto; padding: 14px 16px 24px; }
+  h1 { font-size: 15px; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  h2 { font-size: 12px; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; font-weight: 600; text-transform: none; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  button, select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 10px; font: inherit; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  label.chk { display: inline-flex; gap: 5px; align-items: center; margin-right: 10px; color: var(--text); cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); font-size: 13px; }
+  th:first-child, td:first-child { text-align: left; color: var(--muted); }
+  th { color: var(--muted); font-weight: 500; }
+  td.warn { color: var(--warn); font-weight: 600; } td.bad { color: var(--bad); font-weight: 600; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+  .badge.ok { background: rgba(62,207,142,.18); color: var(--ok); }
+  .badge.bad { background: rgba(255,92,92,.18); color: var(--bad); }
+  .badge.warn { background: rgba(245,197,66,.18); color: var(--warn); }
+  .issue { padding: 6px 8px; border-left: 3px solid var(--line); margin: 5px 0; background: var(--bg); border-radius: 0 6px 6px 0; font-size: 12.5px; }
+  .issue.error { border-color: var(--bad); } .issue.warning { border-color: var(--warn); }
+  .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--ok); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; margin-right: 12px; font-size: 12px; color: var(--muted); }
+  .legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  @media (max-width: 760px) { #app { flex-direction: column; } #side { flex: 0 0 46%; max-width: none; border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"><canvas id="cv"></canvas><div id="hud"></div></div>
+  <aside id="side">
+    <h1 id="title">動作シミュレーション</h1>
+    <div class="sub" id="subtitle"></div>
+
+    <div class="row">
+      <button id="play" class="primary">▶ 再生</button>
+      <button id="prev" title="1 コマ戻る">◀</button>
+      <button id="next" title="1 コマ進む">▶</button>
+      <select id="speed" title="速さ"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+    </div>
+    <input id="frame" type="range" min="0" max="0" value="0">
+    <div class="row">
+      <select id="poseSel" title="ポーズへ移動" style="flex:1"></select>
+      <button id="resetView">視点を戻す</button>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="optRays" checked>光の向き</label>
+      <label class="chk"><input type="checkbox" id="optSpots" checked>測定点</label>
+      <label class="chk"><input type="checkbox" id="optCam" checked>カメラ視野</label>
+      <label class="chk"><input type="checkbox" id="optTrail">光源の軌跡</label>
+    </div>
+
+    <h2>現在のコマ</h2>
+    <div id="state"></div>
+
+    <h2>関節角 [度]</h2>
+    <table id="joints"></table>
+
+    <h2>左右アームの距離</h2>
+    <div id="dist"></div>
+
+    <h2>測定点の角度(選んだ点)</h2>
+    <div class="row"><select id="spotSel" style="flex:1"></select></div>
+    <table id="angles"></table>
+
+    <h2>事前検査の結果(このポーズ)</h2>
+    <div id="issues"></div>
+
+    <div class="legend" style="margin-top:14px">
+      <span><i style="background:var(--left)"></i>左アーム(光源)</span>
+      <span><i style="background:var(--right)"></i>右アーム(試料)</span>
+      <span><i style="background:var(--bad)"></i>干渉の恐れ</span>
+    </div>
+    <div class="note">アームは、リンクを太さのある棒で表した簡易モデルです(実際の外形ではありません)。ポーズ間は、実機の moveJ と同じく関節角を直線的に補間し、左アーム → 右アームの順に動かしています。</div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const D = /*__BRDF_DATA__*/null;
+
+// ---------- ベクトル ----------
+const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+const add = (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+const mul = (a, s) => [a[0]*s, a[1]*s, a[2]*s];
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const norm = a => { const n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/n, a[1]/n, a[2]/n]; };
+const pt = (arr, i) => [arr[3*i], arr[3*i+1], arr[3*i+2]];
+
+// ---------- データ ----------
+const FR = D.frames;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let cur = 0, playing = false, speed = 1, holdUntil = 0, lastTick = 0, spotIdx = 0;
+
+// ---------- 視点 ----------
+const defView = () => ({ az: -0.75, el: 0.42, dist: D.view.dist, t: D.view.target.slice() });
+let V = defView();
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect();
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  draw();
+}
+window.addEventListener("resize", resize);
+
+function camera() {
+  const ce = Math.cos(V.el), se = Math.sin(V.el), ca = Math.cos(V.az), sa = Math.sin(V.az);
+  const eye = [V.t[0] + V.dist*ce*ca, V.t[1] + V.dist*ce*sa, V.t[2] + V.dist*se];
+  const fwd = norm(sub(V.t, eye));
+  const right = norm(cross(fwd, [0, 0, 1]));
+  const up = cross(right, fwd);
+  const f = 0.5 * Math.min(W, H * 1.15) / Math.tan(0.5 * 40 * Math.PI / 180) ;
+  return { eye, fwd, right, up, f };
+}
+let C = null;
+function P(p) {
+  const v = sub(p, C.eye), z = dot(v, C.fwd);
+  const s = C.f / Math.max(z, 1);
+  return { x: W/2 + dot(v, C.right) * s, y: H/2 - dot(v, C.up) * s, z, s };
+}
+
+// ---------- 描画プリミティブ(奥から手前へ) ----------
+let prims = [];
+const line = (a, b, color, w, alpha = 1, dash = null) => {
+  const pa = P(a), pb = P(b); if (pa.z < 1 || pb.z < 1) return;
+  prims.push({ z: (pa.z + pb.z) / 2, d() { ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, w);
+    ctx.lineCap = "round"; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.setLineDash([]); } });
+};
+const dotAt = (a, r, color, alpha = 1, ring = null) => {
+  const pa = P(a); if (pa.z < 1) return;
+  prims.push({ z: pa.z - 1, d() { ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.beginPath(); ctx.arc(pa.x, pa.y, Math.max(1.5, r * pa.s), 0, 7); ctx.fill();
+    if (ring) { ctx.strokeStyle = ring; ctx.lineWidth = 1.5; ctx.stroke(); } } });
+};
+const poly = (pts, fill, stroke, alpha) => {
+  const ps = pts.map(P); if (ps.some(q => q.z < 1)) return;
+  prims.push({ z: ps.reduce((s, q) => s + q.z, 0) / ps.length + 50, d() {
+    ctx.globalAlpha = alpha; ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ps.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; ctx.stroke(); } });
+};
+const text = (a, s, color, dx = 8, dy = -8) => {
+  const pa = P(a); if (pa.z < 1) return;
+  prims.push({ z: pa.z - 5, d() { ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.font = "12px sans-serif"; ctx.fillText(s, pa.x + dx, pa.y + dy); } });
+};
+
+// ---------- シーン ----------
+function frameAxes(f) { return { x: [f.a[0], f.a[1], f.a[2]], y: [f.a[3], f.a[4], f.a[5]], z: [f.a[6], f.a[7], f.a[8]] }; }
+function sampleToWorld(o, ax, s) { return add(add(o, mul(ax.x, s[0])), mul(ax.y, s[1])); }
+
+function buildScene() {
+  prims = [];
+  const f = FR[cur], bad = f.d < D.clearance;
+  const cL = bad ? css("--bad") : css("--left"), cR = bad ? css("--bad") : css("--right");
+  const muted = css("--muted"), lineC = css("--line");
+
+  // 床のグリッドと世界座標の軸
+  for (let v = D.grid.min; v <= D.grid.max; v += D.grid.step) {
+    line([v, D.grid.min, 0], [v, D.grid.max, 0], lineC, 1, 0.7);
+    line([D.grid.min, v, 0], [D.grid.max, v, 0], lineC, 1, 0.7);
+  }
+  line([0, 0, 0], [150, 0, 0], "#ff5c5c", 2); line([0, 0, 0], [0, 150, 0], "#3ecf8e", 2); line([0, 0, 0], [0, 0, 150], "#4c9aff", 2);
+  text([160, 0, 0], "X", "#ff5c5c", 0, 0); text([0, 160, 0], "Y", "#3ecf8e", 0, 0); text([0, 0, 160], "Z", "#4c9aff", 0, 0);
+
+  // 光源の軌跡(現在のポーズまでの光源位置)
+  if (document.getElementById("optTrail").checked) {
+    for (let i = 1; i <= cur; i++) line(pt(FR[i-1].l, 6), pt(FR[i].l, 6), "#f5c542", 1.2, 0.5);
+  }
+
+  // アーム(太さのある棒)
+  const armPx = (arr, color) => {
+    for (let i = 0; i < 6; i++) {
+      const a = pt(arr, i), b = pt(arr, i + 1);
+      const last = i === 5;   // 先端 → 光源 / 試料面 は細く
+      const pm = P(mul(add(a, b), 0.5));
+      line(a, b, color, (last ? 0.18 : 0.5) * D.radius * 2 * pm.s, last ? 0.6 : 0.95);
+    }
+    for (let i = 0; i <= 5; i++) dotAt(pt(arr, i), 11, "#ffffff", 0.95, color);
+  };
+  armPx(f.l, cL); armPx(f.r, cR);
+  text(pt(f.l, 0), "左アーム(光源)", cL, 10, -4); text(pt(f.r, 0), "右アーム(試料)", cR, 10, -4);
+
+  // 光源
+  const light = pt(f.l, 6);
+  dotAt(light, 26, "#f5c542", 0.95, "#ffffff"); text(light, "光源", "#f5c542");
+
+  // 試料の板と座標系
+  const o = pt(f.r, 6), ax = frameAxes(f);
+  poly(D.plate.map(s => sampleToWorld(o, ax, s)), "#9aa7b4", "#cfd8e3", 0.28);
+  line(o, add(o, mul(ax.x, 70)), "#ff5c5c", 2); line(o, add(o, mul(ax.y, 70)), "#3ecf8e", 2); line(o, add(o, mul(ax.z, 70)), "#4c9aff", 2);
+  dotAt(o, 6, "#ffffff", 1, "#222");
+
+  // カメラと視野
+  const cam = D.camera.position;
+  dotAt(cam, 40, css("--accent"), 0.95, "#fff"); text(cam, "2D 分光放射計", css("--accent"), 10, -6);
+  if (document.getElementById("optCam").checked) {
+    D.camera.frustum.forEach((c, i) => {
+      line(cam, c, css("--accent"), 1.2, 0.55, [4, 4]);
+      line(c, D.camera.frustum[(i + 1) % 4], css("--accent"), 1.2, 0.55, [4, 4]);
+    });
+  }
+
+  // 測定点と、そこから光源・カメラへの向き
+  const sp = D.spots[spotIdx];
+  if (document.getElementById("optSpots").checked) {
+    D.spots.forEach((s, i) => dotAt(sampleToWorld(o, ax, [s.x, s.y]), 5, i === spotIdx ? "#ffffff" : "#c9d4df", 0.95, i === spotIdx ? "#f5c542" : null));
+  }
+  if (document.getElementById("optRays").checked && sp) {
+    const w = sampleToWorld(o, ax, [sp.x, sp.y]);
+    line(w, light, "#f5c542", 1.6, 0.9, [6, 4]);
+    line(w, cam, css("--accent"), 1.6, 0.9, [6, 4]);
+  }
+
+  prims.sort((a, b) => b.z - a.z);
+}
+
+function draw() {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  C = camera();
+  buildScene();
+  for (const p of prims) p.d();
+  ctx.globalAlpha = 1;
+  const f = FR[cur];
+  document.getElementById("hud").innerHTML =
+    `<b>ポーズ ${D.poses[f.p].id}</b> / ${D.poses.length}   ${stageName(f.s)}   コマ ${cur + 1} / ${FR.length}`;
+}
+
+// ---------- 表示パネル ----------
+const stageName = s => ({ S: "初期位置", L: "左アームを移動中", R: "右アームを移動中", M: "測定(静止)" }[s]);
+const $ = id => document.getElementById(id);
+
+function nearLimit(q, i) {
+  const lo = D.limits.lower[i], hi = D.limits.upper[i], span = hi - lo;
+  if (q < lo || q > hi) return "bad";
+  return (q - lo < 0.05 * span || hi - q < 0.05 * span) ? "warn" : "";
+}
+
+function updatePanel() {
+  const f = FR[cur], pose = D.poses[f.p];
+  $("state").innerHTML = `<span class="badge ${f.d < D.clearance ? "bad" : "ok"}">${f.d < D.clearance ? "干渉の恐れ" : "問題なし"}</span> &nbsp;${stageName(f.s)}`;
+
+  let h = "<tr><th></th><th>左</th><th>右</th><th>範囲</th></tr>";
+  for (let i = 0; i < 6; i++) {
+    h += `<tr><td>J${i + 1}</td><td class="${nearLimit(f.ld[i], i)}">${f.ld[i].toFixed(1)}</td><td class="${nearLimit(f.rd[i], i)}">${f.rd[i].toFixed(1)}</td>` +
+         `<td>${D.limits.lower[i].toFixed(0)}〜${D.limits.upper[i].toFixed(0)}</td></tr>`;
+  }
+  $("joints").innerHTML = h;
+
+  const ratio = Math.min(1, f.d / (D.clearance * 3));
+  $("dist").innerHTML = `<div>${f.d.toFixed(0)} mm <span style="color:var(--muted)">(基準 ${D.clearance.toFixed(0)} mm 以上)</span></div>` +
+    `<div class="bar"><i style="width:${(ratio * 100).toFixed(0)}%;background:${f.d < D.clearance ? css("--bad") : css("--ok")}"></i></div>`;
+
+  const a = pose.angles[spotIdx];
+  $("angles").innerHTML = a
+    ? `<tr><th></th><th>天頂角 θ</th><th>方位角 φ</th></tr><tr><td>入射(光源)</td><td>${a[0].toFixed(2)}°</td><td>${a[1].toFixed(2)}°</td></tr>` +
+      `<tr><td>観察(カメラ)</td><td>${a[2].toFixed(2)}°</td><td>${a[3].toFixed(2)}°</td></tr>` : "";
+
+  $("issues").innerHTML = pose.issues.length
+    ? pose.issues.map(i => `<div class="issue ${i.sev}">${escapeHtml(i.msg)}</div>`).join("")
+    : `<span class="badge ok">指摘なし</span>`;
+
+  $("frame").value = cur;
+  $("poseSel").value = f.p;
+}
+const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function setFrame(i) { cur = Math.max(0, Math.min(FR.length - 1, i)); updatePanel(); draw(); }
+
+// ---------- 再生 ----------
+function tick(now) {
+  if (!playing) return;
+  const interval = 1000 / (24 * speed);
+  if (now >= holdUntil && now - lastTick >= interval) {
+    lastTick = now;
+    if (cur >= FR.length - 1) { playing = false; $("play").textContent = "▶ 再生"; }
+    else {
+      setFrame(cur + 1);
+      if (FR[cur].s === "M") holdUntil = now + 900 / speed;   // 測定のコマで少し止まる
+    }
+  }
+  requestAnimationFrame(tick);
+}
+$("play").onclick = () => {
+  if (cur >= FR.length - 1) cur = 0;
+  playing = !playing; $("play").textContent = playing ? "⏸ 一時停止" : "▶ 再生";
+  if (playing) { lastTick = 0; requestAnimationFrame(tick); }
+};
+$("prev").onclick = () => setFrame(cur - 1);
+$("next").onclick = () => setFrame(cur + 1);
+$("speed").onchange = e => { speed = parseFloat(e.target.value); };
+$("frame").oninput = e => setFrame(parseInt(e.target.value, 10));
+$("poseSel").onchange = e => { const p = parseInt(e.target.value, 10); const i = FR.findIndex(f => f.p === p && f.s === "M"); setFrame(i < 0 ? 0 : i); };
+$("spotSel").onchange = e => { spotIdx = parseInt(e.target.value, 10); updatePanel(); draw(); };
+$("resetView").onclick = () => { V = defView(); draw(); };
+["optRays", "optSpots", "optCam", "optTrail"].forEach(id => $(id).onchange = draw);
+
+// ---------- 視点の操作 ----------
+let drag = null;
+cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 }; cv.setPointerCapture(e.pointerId); cv.classList.add("drag"); });
+cv.addEventListener("pointerup", () => { drag = null; cv.classList.remove("drag"); });
+cv.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.pan) {
+    const k = V.dist / C.f;
+    V.t = add(V.t, add(mul(C.right, -dx * k), mul(C.up, dy * k)));
+  } else {
+    V.az -= dx * 0.008; V.el = Math.max(-1.45, Math.min(1.45, V.el + dy * 0.008));
+  }
+  draw();
+});
+cv.addEventListener("wheel", e => { e.preventDefault(); V.dist = Math.max(300, Math.min(8000, V.dist * Math.exp(e.deltaY * 0.0012))); draw(); }, { passive: false });
+cv.addEventListener("contextmenu", e => e.preventDefault());
+
+// ---------- 初期化 ----------
+$("title").textContent = D.name || "動作シミュレーション";
+$("subtitle").textContent = `ポーズ ${D.poses.length} 個 / 測定点 ${D.spots.length} 個 / ${FR.length} コマ   ・   ${D.generated}`;
+$("poseSel").innerHTML = D.poses.map((p, i) => `<option value="${i}">ポーズ ${escapeHtml(p.id)}${p.issues.some(x => x.sev === "error") ? "  ⚠" : ""}</option>`).join("");
+$("spotSel").innerHTML = D.spots.map((s, i) => `<option value="${i}">測定点 ${s.id}(x=${s.x}, y=${s.y} mm)</option>`).join("");
+$("frame").max = FR.length - 1;
+resize();
+setFrame(FR.findIndex(f => f.s === "M") >= 0 ? FR.findIndex(f => f.s === "M") : 0);
+</script>
+</body>
+</html>

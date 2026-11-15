@@ -8,6 +8,7 @@
 *   brdf run   <dir> [--kind K] [--yes]      測定を実行して結果を保存する
 *   brdf angles <dir>                        角度だけを出力する
 *   brdf analyze <dir> [--sample R] [--white R]  試料と白色板の測定から、放射輝度率と BRDF を計算する
+*   brdf view <dir> [--steps N]              ポーズの動きを、ブラウザで見られる 3D アニメーション(HTML)にする
 *   brdf spots <dir>                         SR-5000 用のスポット定義ファイル(XML)を、ポーズごとに出力する
 *   brdf import-poses <csv> [--out F]        旧システムのポーズ CSV から recipe.toml を作る
 */
@@ -21,6 +22,7 @@
 #include "brdf/app/Analyze.hpp"
 #include "brdf/app/Calibrate.hpp"
 #include "brdf/app/Commands.hpp"
+#include "brdf/app/ViewExport.hpp"
 
 #ifndef BRDF_VERSION
 #define BRDF_VERSION "0.0.0"
@@ -117,6 +119,19 @@ int main(int argc, char** argv) {
         options.white_run = an_white;
         if (an_correct) options.irradiance_correction = true;
         auto r = brdf::app::analyzeProject(an_dir, options);
+        if (!r) { exit_code = reportError(r.error()); return; }
+    });
+
+    // --- view ---
+    std::string view_dir;
+    int view_steps = 15;
+    auto* view = app.add_subcommand("view", "Export the poses as a 3D animation (one HTML file, opens in any browser)");
+    view->add_option("dir", view_dir, "project folder")->required();
+    view->add_option("--steps", view_steps, "frames per arm movement (smoother, bigger file)")->capture_default_str()->check(CLI::Range(1, 200));
+    view->callback([&] {
+        brdf::app::ViewOptions options;
+        options.steps_per_move = view_steps;
+        auto r = brdf::app::exportView(view_dir, options);
         if (!r) { exit_code = reportError(r.error()); return; }
     });
 
