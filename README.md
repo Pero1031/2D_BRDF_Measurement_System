@@ -30,8 +30,8 @@ A detailed analysis of the previous system is in [docs/LegacySystemAnalysis.md](
 | P1 | Geometry and angles (forward kinematics, angle computation, check against previous data) | Done |
 | P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`, mock arms and imager) | Done |
 | P3 | Project folders, TOML configuration, measurement session, CLI | Done |
-| P4 | Calibration board, homography, spot XML | Next |
-| P5 | Analysis (white-board normalization, BRDF reconstruction) | Not started |
+| P4 | Calibration board, homography, spot XML | Done |
+| P5 | Analysis (white-board normalization, BRDF reconstruction) | Next |
 | P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
 | P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
 
@@ -51,11 +51,13 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A measurement session that runs a recipe on the (simulated) devices and saves per-spot angles and spectra as CSV, together with a record of the settings used
 - A pre-flight check that finds joint-limit violations, arm collisions (including on the way to a pose) and spots whose light or camera is behind the surface, without moving anything
 - Import of the previous system's pose CSV (all 52 poses are accepted)
+- Calibration-board processing: circle-grid detection, a least-squares homography per pose, and SR-5000 spot definition files (XML). Checked against the previous system's real data: 13 images of 77 circles are detected and fitted, and the homographies agree with the saved ones to within 1 pixel at the paper corners; a previous spot XML is read and written back identically
+- A simulated camera board: the simulator draws the calibration board through its camera model, so `calibrate` → `run` can be tried end to end without hardware
 - The `brdf` command line: `init`, `check`, `run`, `angles`, `import-poses`
 
 ### What does not exist yet
 
-Real hardware control (`mode = "real"` reports "not supported yet"), calibration-board processing (the simulator uses its camera model instead of a homography) and BRDF analysis.
+Real hardware control (`mode = "real"` reports "not supported yet") and BRDF analysis.
 
 ## Hardware
 
@@ -74,8 +76,10 @@ build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; typ
 |---|---|
 | `brdf init <dir>` | create a project folder with template `setup.toml` and `recipe.toml` |
 | `brdf check <dir>` | check limits, collisions and angles without moving any device |
+| `brdf calibrate <dir>` | photograph the calibration board at every pose, detect the circles and save one homography per pose |
 | `brdf run <dir> [--kind sample\|white\|calib] [--yes]` | run the measurement and save the result under `result/<date>_<time>_<kind>/` |
 | `brdf angles <dir>` | write only the angles of every pose and spot |
+| `brdf spots <dir>` | write SR-5000 spot definition files (XML), one per pose, from the calibration |
 | `brdf import-poses <csv> [--out recipe.toml]` | build a recipe from the previous system's pose CSV |
 
 A project folder holds everything about one measurement, and no absolute path is written in it:
@@ -84,11 +88,29 @@ A project folder holds everything about one measurement, and no absolute path is
 my_measurement/
   setup.toml      rig layout (arm dimensions and limits, light and camera positions) and device mode
   recipe.toml     poses, spots on the sample (mm), capture settings, checklist
+  calibration/
+    images/<pose>.png    the calibration-board images
+    homographies.csv     one homography per pose, with the reprojection error
   result/<date>_<time>_<kind>/
     measurements.csv     one row per (pose, spot): angles [deg] then the spectrum
     run_manifest.toml    when and how it was measured
     setup.toml, recipe.toml   copies of the settings used
 ```
+
+### Using the calibration board
+
+By default the simulator projects the spots with its own camera model (`projector = "camera-model"`). Real devices need the calibration board (`projector = "board"`):
+
+```bash
+build/Debug/brdf.exe calibrate examples/sim_project   # mount the board where the sample goes; one homography per pose
+# set  projector = "board"  in setup.toml, then
+build/Debug/brdf.exe run   examples/sim_project
+build/Debug/brdf.exe spots examples/sim_project       # spot definition files for the SR-5000 software
+```
+
+How the board is mounted matters: because the circles form a symmetric grid, the image alone cannot tell which way round the board is.
+`board_u` / `board_v` in `setup.toml` say which sample axes (`"+x"`, `"-x"`, `"+y"`, `"-y"`) the board's right and down directions correspond to,
+and the board must appear rotated by less than 90° in the image.
 
 ## Build and test
 
@@ -113,10 +135,13 @@ Run the mock demo:
 build/Debug/brdf_mock_demo.exe
 ```
 
-Compare against every row of the previous system's angle tables (not part of the normal test run):
+Compare against the previous system's real data (not part of the normal test run):
 
 ```bash
+rem every row of the angle tables
 set BRDF_OLD_ANGLE_TABLE_DIR=D:\Data\AngleTable
+rem the 13 calibration-board images (the old project's AgInkBeta folder)
+set BRDF_LEGACY_CALIB_DIR=<path to AgInkBeta>
 build\tests\Debug\brdf_tests.exe "[.full]"
 ```
 
@@ -128,7 +153,9 @@ include/brdf/   public headers
   geometry/       joint angles, forward kinematics, rig layout
   optics/         incidence / observation angle computation
   driver/         interfaces for the robot arm and the spectral imager
-  io/             setup.toml and recipe.toml reading / writing, pose CSV import
+  io/             setup.toml, recipe.toml, calibration CSV and spot XML reading / writing, pose CSV import
+  calibration/    board layout, homography, how the board is mounted, per-pose spot projection
+  vision/         (OpenCV) circle-grid detection, homography fit, image files, the calibrate command
   app/            measurement session, pre-flight check, project layout, commands
   sim/            simulator: rig, mock arm, mock imager, BRDF models, camera
   domain/         recipe (poses, spots, capture settings)

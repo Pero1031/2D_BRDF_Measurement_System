@@ -41,6 +41,8 @@
 #include "brdf/vision/HomographyFit.hpp"
 #include "brdf/vision/CircleGridDetector.hpp"
 #include "brdf/app/Calibrate.hpp"
+#include "brdf/io/SpotXml.hpp"
+#include "brdf/calibration/SampleToBoard.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

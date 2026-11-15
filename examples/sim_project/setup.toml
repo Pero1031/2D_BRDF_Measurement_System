@@ -28,6 +28,28 @@ light_offset = [-30.0, 108.0, 0.0]   # 左アーム先端の座標系で見た�
 camera_position = [1136.0, 728.0, 560.0]   # 2D分光放射計の位置
 sample_surface_offset = 6.0   # 右アーム先端から試料面まで(アクリル 5 + 紙 1)
 
+[calibration]
+projector = "camera-model"   # "camera-model" = シミュレータのカメラで直接(sim のみ)、"board" = キャリブボードのホモグラフィ(実機)
+max_rms_px = 3.0   # 校正の再投影誤差(rms)の許容値
+
+[calibration.board]   # キャリブボード(黒円の格子)。座標は紙の角が原点、mm
+columns = 15
+rows = 7
+pitch_x = 25.0
+pitch_y = 25.0
+first_x = 75.0   # 最初の円の中心(座標が最小の円)
+first_y = 101.0
+paper_width = 450.0
+paper_height = 302.0
+circle_diameter = 16.0
+board_u = "+x"   # ボードを正面から見て右向きの軸は、試料座標のどの軸か("+x" "-x" "+y" "-y")
+board_v = "-y"   # 同、下向きの軸
+# sample_origin = [225.0, 151.0]   # 試料座標の原点がボード座標のどこか。省略すると紙の中心
+
+[spot_xml]   # brdf spots が作る、SR-5000 用のスポット定義ファイル
+binning = "BINNING_TYPE1"   # 分光放射計のビニング設定(レシピと合わせる)
+spot_size = 2.0   # 各スポットの一辺 [pixel]
+
 # ---- ここから下はシミュレーション(mode = "sim")のときだけ使う設定 ----
 
 [sim.camera]

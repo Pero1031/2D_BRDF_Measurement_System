@@ -5,12 +5,21 @@
 
 #include "brdf/app/ProjectLayout.hpp"
 
+#include <cctype>
 #include <string>
 #include <system_error>
 
 namespace brdf::app {
 
     namespace fs = std::filesystem;
+
+    std::string fileSafeName(const std::string& name) {
+        std::string out = name;
+        for (char& c : out) {
+            if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.')) c = '_';
+        }
+        return out.empty() ? "_" : out;
+    }
 
     Status ProjectLayout::createFolders() const {
         std::error_code ec;

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SpotDef version="1.0" type="RDM" datetime="2020/09/14 20:39:32.733" comment="Random-Spot">
+    <Setting>
+        <MeasurementRoi x="0" y="0" width="1376" height="1024"/>
+        <Binning type="BINNING_TYPE1"/>
+        <Trimming x="0" y="0" width="0" height="0"/>
+        <InitSpot shape="SQUARE" width="1.00" height="1.00"/>
+        <Renumbering enable="TRUE"/>
+        <ApplyThreshold enable="FALSE"/>
+    </Setting>
+    <SpotAreaList>
+        <AreaData id="1" enable="true" shape="SQUARE">
+            <AreaCenter x="486" y="485"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="2" enable="true" shape="SQUARE">
+            <AreaCenter x="509" y="503"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="3" enable="true" shape="SQUARE">
+            <AreaCenter x="473" y="517"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="4" enable="true" shape="SQUARE">
+            <AreaCenter x="496" y="535"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="5" enable="true" shape="SQUARE">
+            <AreaCenter x="539" y="525"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="6" enable="true" shape="SQUARE">
+            <AreaCenter x="563" y="544"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="7" enable="true" shape="SQUARE">
+            <AreaCenter x="526" y="558"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="8" enable="true" shape="SQUARE">
+            <AreaCenter x="550" y="576"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="9" enable="true" shape="SQUARE">
+            <AreaCenter x="464" y="540"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="10" enable="true" shape="SQUARE">
+            <AreaCenter x="487" y="558"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="11" enable="true" shape="SQUARE">
+            <AreaCenter x="452" y="571"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="12" enable="true" shape="SQUARE">
+            <AreaCenter x="474" y="589"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="13" enable="true" shape="SQUARE">
+            <AreaCenter x="516" y="580"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="14" enable="true" shape="SQUARE">
+            <AreaCenter x="540" y="599"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="15" enable="true" shape="SQUARE">
+            <AreaCenter x="503" y="612"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+        <AreaData id="16" enable="true" shape="SQUARE">
+            <AreaCenter x="527" y="631"/>
+            <AreaSize width="2.00" height="2.00"/>
+            <ThresHold x="0.000000" y="0.000000" z="0.000000"/>
+            <Judgment base="FALSE" xy="0" uv="0" ch="0"/>
+        </AreaData>
+    </SpotAreaList>
+</SpotDef>

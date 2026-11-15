@@ -7,6 +7,7 @@
 *   brdf calibrate <dir>                     キャリブボードを撮影して、ポーズごとのホモグラフィを求める
 *   brdf run   <dir> [--kind K] [--yes]      測定を実行して結果を保存する
 *   brdf angles <dir>                        角度だけを出力する
+*   brdf spots <dir>                         SR-5000 用のスポット定義ファイル(XML)を、ポーズごとに出力する
 *   brdf import-poses <csv> [--out F]        旧システムのポーズ CSV から recipe.toml を作る
 */
 
@@ -97,6 +98,15 @@ int main(int argc, char** argv) {
         auto r = brdf::app::exportAngles(angles_dir);
         if (!r) { exit_code = reportError(r.error()); return; }
         spdlog::info("Wrote {}", (*r / "angles.csv").string());
+    });
+
+    // --- spots ---
+    std::string spots_dir;
+    auto* spots = app.add_subcommand("spots", "Write SR-5000 spot definition files (XML), one per pose, from the calibration");
+    spots->add_option("dir", spots_dir, "project folder")->required();
+    spots->callback([&] {
+        auto r = brdf::app::exportSpots(spots_dir);
+        if (!r) { exit_code = reportError(r.error()); return; }
     });
 
     // --- import-poses ---

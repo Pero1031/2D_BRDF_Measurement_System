@@ -27,15 +27,6 @@ namespace brdf::app {
 
     namespace {
 
-        // ポーズの名前をファイル名に使えるようにする
-        std::string fileSafe(const std::string& id) {
-            std::string out = id;
-            for (char& c : out) {
-                if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_' || c == '.')) c = '_';
-            }
-            return out.empty() ? "_" : out;
-        }
-
         struct Guard {
             std::function<void()> action;
             ~Guard() { if (action) action(); }
@@ -112,7 +103,7 @@ namespace brdf::app {
                 continue;
             }
 
-            const fs::path image_path = layout.calibrationImagesDir() / (fileSafe(pose.id) + ".png");
+            const fs::path image_path = layout.calibrationImagesDir() / (fileSafeName(pose.id) + ".png");
             if (auto s = vision::saveGrayImage(image_path, *image); !s) {
                 fail_pose(s.error().message);
                 continue;

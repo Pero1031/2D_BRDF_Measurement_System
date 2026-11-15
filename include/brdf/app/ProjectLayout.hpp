@@ -6,11 +6,15 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <string_view>
 
 #include "brdf/core/Error.hpp"
 
 namespace brdf::app {
+
+    /// ポーズの名前などを、ファイル名に使える形にする(英数字・- _ . 以外は _ に置き換える)。
+    std::string fileSafeName(const std::string& name);
 
     /// 測定プロジェクトのフォルダ構成。
     ///

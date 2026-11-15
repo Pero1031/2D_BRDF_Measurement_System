@@ -18,6 +18,8 @@
 #include "brdf/app/ProjectLayout.hpp"
 #include "brdf/calibration/HomographySpotProjector.hpp"
 #include "brdf/io/CalibrationFile.hpp"
+#include "brdf/io/SpotXml.hpp"
+#include "brdf/app/AngleTable.hpp"
 #include "brdf/app/ResultFiles.hpp"
 #include "brdf/io/RecipeFile.hpp"
 #include "brdf/io/SetupConfig.hpp"
@@ -258,6 +260,55 @@ namespace brdf::app {
         if (auto s = writeText(*run_dir / "angles.csv", anglesCsv(geometry, loaded->recipe)); !s) {
             return tl::unexpected(s.error());
         }
+        return *run_dir;
+    }
+
+    Result<fs::path> exportSpots(const fs::path& dir, const std::string& timestamp) {
+        const ProjectLayout layout(dir);
+        auto loaded = loadProject(dir);
+        if (!loaded) return tl::unexpected(loaded.error());
+
+        if (loaded->setup.calibration.projector != "board") {
+            return fail(ErrorCode::InvalidArgument,
+                        "brdf spots needs [calibration] projector = \"board\" in setup.toml (the positions come from the "
+                        "calibration-board homographies; run `brdf calibrate` first)");
+        }
+        auto projector = loadBoardProjector(layout, *loaded);
+        if (!projector) return tl::unexpected(projector.error());
+
+        const geometry::RigGeometry geometry(loaded->setup.rig);
+        const std::string stamp = timestamp.empty() ? currentTimestamp() : timestamp;
+
+        // 先にすべての位置を計算する(画像の外に出る点があれば、ファイルを 1 つも作らずに止める)
+        std::vector<std::pair<std::string, std::vector<driver::SpotRequest>>> per_pose;
+        for (const domain::PoseStep& pose : loaded->recipe.poses) {
+            std::vector<driver::SpotRequest> spots;
+            for (const PatchAngles& p : computePoseAngles(geometry, pose, loaded->recipe.spots)) {
+                auto pixel = (*projector)->pixelFor(SpotQuery{pose.id, p.sample_mm, p.world_point});
+                if (!pixel) {
+                    return fail(pixel.error().code, "pose \"" + pose.id + "\", spot " + std::to_string(p.spot_id) + ": "
+                                                    + pixel.error().message);
+                }
+                spots.push_back({p.spot_id, *pixel});
+            }
+            per_pose.emplace_back(pose.id, std::move(spots));
+        }
+
+        io::SpotXmlSettings settings;
+        settings.roi_width = loaded->setup.camera.image_width;
+        settings.roi_height = loaded->setup.camera.image_height;
+        settings.binning = loaded->setup.spot_xml.binning;
+        settings.spot_size = loaded->setup.spot_xml.spot_size;
+        settings.datetime = io::spotXmlDatetime(stamp);
+
+        auto run_dir = layout.createRunDir(stamp, "spots");
+        if (!run_dir) return tl::unexpected(run_dir.error());
+        for (const auto& [pose_id, spots] : per_pose) {
+            if (auto s = writeText(*run_dir / (fileSafeName(pose_id) + "_spot.xml"), io::toSpotXml(settings, spots)); !s) {
+                return tl::unexpected(s.error());
+            }
+        }
+        spdlog::info("Wrote {} spot definition file(s) to {}", per_pose.size(), run_dir->string());
         return *run_dir;
     }
 

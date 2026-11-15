@@ -73,12 +73,19 @@ namespace brdf::io {
         }
     };
 
+    /// スポット定義ファイル(SR-5000 のソフトに読み込ませる XML)の設定。
+    struct SpotXmlConfig {
+        std::string binning = "BINNING_TYPE1";   ///< 分光放射計のビニング設定(レシピと合わせる)
+        Real spot_size = 2.0;                    ///< 各スポットの一辺 [pixel]
+    };
+
     /// setup.toml の内容。旧システムでヘッダに直書きしていた装置の定数をここに集める。
     struct SetupConfig {
         DeviceMode mode = DeviceMode::Sim;
         geometry::RigSetup rig;
         SimCameraConfig camera;
         CalibrationConfig calibration;
+        SpotXmlConfig spot_xml;
         sim::MockImagerOptions imager;
         SimSampleConfig sample;
     };

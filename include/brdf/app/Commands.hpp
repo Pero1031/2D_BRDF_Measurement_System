@@ -54,6 +54,11 @@ namespace brdf::app {
     /// 機器を使わず、角度だけを result/<日時>_angles/angles.csv に出力する。
     Result<std::filesystem::path> exportAngles(const std::filesystem::path& dir, const std::string& timestamp = "");
 
+    /// 全ポーズ・全測定点の画像上の位置から、SR-5000 のソフトに読み込ませるスポット定義ファイル(XML)を、
+    /// ポーズごとに result/<日時>_spots/<ポーズ>_spot.xml へ出力する。旧システムの「ホモグラフィ → スポット XML」に相当する。
+    /// キャリブボードの校正結果が必要([calibration] projector = "board"、先に brdf calibrate)。機器は動かさない。
+    Result<std::filesystem::path> exportSpots(const std::filesystem::path& dir, const std::string& timestamp = "");
+
     /// 旧システムのポーズ CSV から recipe.toml を作る。既にあれば force のときだけ上書きする。
     Status importPoses(const std::filesystem::path& legacy_csv, const std::filesystem::path& recipe_out, bool force);
 

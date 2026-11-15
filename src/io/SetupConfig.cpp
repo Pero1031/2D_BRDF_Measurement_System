@@ -87,6 +87,9 @@ namespace brdf::io {
             if (auto m = cal.mapping(); !m) {
                 return fail(ErrorCode::InvalidArgument, "setup: [calibration.board] " + m.error().message);
             }
+            if (c.spot_xml.binning.empty() || !positive(c.spot_xml.spot_size)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [spot_xml] binning must not be empty and spot_size must be positive");
+            }
             if (c.sample.model != "lambert" && c.sample.model != "phong") {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.sample] model must be \"lambert\" or \"phong\"");
             }
@@ -185,6 +188,15 @@ namespace brdf::io {
             }
             BRDF_TRY(board->finish());
             BRDF_TRY(cal->finish());
+        }
+
+        // --- [spot_xml] ---
+        {
+            auto s = top.child("spot_xml");
+            if (!s) return tl::unexpected(s.error());
+            BRDF_TRY(s->string("binning", c.spot_xml.binning));
+            BRDF_TRY(s->number("spot_size", c.spot_xml.spot_size));
+            BRDF_TRY(s->finish());
         }
 
         // --- [sim.*] ---
@@ -310,6 +322,10 @@ namespace brdf::io {
             o << "# sample_origin = [225.0, 151.0]   # 試料座標の原点がボード座標のどこか。省略すると紙の中心\n";
         }
         o << "\n";
+
+        o << "[spot_xml]   # brdf spots が作る、SR-5000 用のスポット定義ファイル\n"
+          << "binning = " << quote(c.spot_xml.binning) << "   # 分光放射計のビニング設定(レシピと合わせる)\n"
+          << "spot_size = " << num(c.spot_xml.spot_size) << "   # 各スポットの一辺 [pixel]\n\n";
 
         o << "# ---- ここから下はシミュレーション(mode = \"sim\")のときだけ使う設定 ----\n\n";
 

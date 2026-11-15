@@ -39,6 +39,7 @@ add_library(brdf_core
     src/io/SetupConfig.cpp
     src/io/RecipeFile.cpp
     src/io/CalibrationFile.cpp
+    src/io/SpotXml.cpp
     src/app/AngleTable.cpp
     src/app/Preflight.cpp
     src/app/MeasurementSession.cpp
