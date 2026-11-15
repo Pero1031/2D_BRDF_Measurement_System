@@ -14,7 +14,8 @@
 namespace brdf::geometry {
 
     /// アームのリンク寸法 [mm]。旧システムの RobotParam に相当する。
-    /// 括弧内は旧コードでの名前。
+    /// 括弧内は旧コードでの名前。既定値は DENSO VP-6242 の外形図の寸法と一致する
+    /// (土台の高さ 280、J2-J3 間 210 と 75、前腕 210、手首〜ツール取付面 70)。
     struct ArmLinks {
         Real base_height       = 280.0;     ///< 土台から第1アームまでの高さ (BASE)
         Real upper_arm         = 210.0;     ///< 第1アームの長さ (ARM1)

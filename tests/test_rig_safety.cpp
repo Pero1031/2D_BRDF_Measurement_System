@@ -13,10 +13,32 @@ TEST_CASE("JointLimits finds the first joint outside its range", "[safety]") {
     const JointLimits limits;
 
     CHECK(limits.firstViolation(jointsFromDegrees(0, 0, 90, 0, 0, 0)) == -1);
-    CHECK(limits.firstViolation(jointsFromDegrees(171, 0, 90, 0, 0, 0)) == 0);
-    CHECK(limits.firstViolation(jointsFromDegrees(0, 0, 5, 0, 0, 0)) == 2);        // J3 は 10° 以上
+    CHECK(limits.firstViolation(jointsFromDegrees(161, 0, 90, 0, 0, 0)) == 0);
+    CHECK(limits.firstViolation(jointsFromDegrees(0, 0, 10, 0, 0, 0)) == 2);       // J3 は 19° 以上
     CHECK(limits.firstViolation(jointsFromDegrees(0, 0, 90, 0, 130, 0)) == 4);
     CHECK(limits.firstViolation(jointsFromDegrees(200, 0, 90, 0, 130, 0)) == 0);   // 最初の違反を返す
+}
+
+TEST_CASE("default limits and links follow the DENSO VP-6242 documents", "[safety]") {
+    // ソフトウェアリミット出荷時設定値 (J1 ±160, J2 ±120, J3 +19..+160, J4 ±160, J5 ±120, J6 ±360)
+    const JointLimits limits;
+    const Real expected_lower[6] = {-160, -120, 19, -160, -120, -360};
+    const Real expected_upper[6] = {160, 120, 160, 160, 120, 360};
+    for (int i = 0; i < 6; ++i) {
+        CHECK_THAT(toDegrees(limits.lower(i)), WithinAbs(expected_lower[i], 1e-9));
+        CHECK_THAT(toDegrees(limits.upper(i)), WithinAbs(expected_upper[i], 1e-9));
+    }
+    // J3=90° が前腕水平。外形図の余裕 71°(上向き)と 70°(下向き)と一致する
+    CHECK_THAT(90.0 - toDegrees(limits.lower(2)), WithinAbs(71.0, 1e-9));
+    CHECK_THAT(toDegrees(limits.upper(2)) - 90.0, WithinAbs(70.0, 1e-9));
+
+    // 外形図の寸法: 土台 280、J2-J3 間 210 と 75、前腕 210、手首〜ツール取付面 70
+    const ArmLinks links;
+    CHECK(links.base_height == 280.0);
+    CHECK(links.upper_arm == 210.0);
+    CHECK(links.elbow_offset == 75.0);
+    CHECK(links.forearm == 210.0);
+    CHECK(links.wrist == 70.0);
 }
 
 TEST_CASE("linkPoints agrees with tipPose", "[safety]") {

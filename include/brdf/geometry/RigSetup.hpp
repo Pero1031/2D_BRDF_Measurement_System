@@ -34,12 +34,13 @@ namespace brdf::geometry {
         /// 右アーム先端から試料面までの距離(先端の Z 方向)。アクリル板 5mm + 紙 1mm (旧 calcRightTip の akuriru, paper)
         Real sample_surface_offset = 6.0;
 
-        /// 関節の可動域(左右共通)。既定値は仮の値。実機の仕様で必ず確認すること。
+        /// 関節の可動域(左右共通)。既定値は VP-6242 のソフトウェアリミットの出荷時設定値。
         JointLimits joint_limits;
 
         /// 干渉チェックで、アームを太さのある棒として扱うときの半径 [mm](左右共通)。
-        /// 既定値は仮の値(余裕を持たせた安全側)。実機の寸法で必ず確認すること。
-        Real arm_radius = 40.0;
+        /// VP-6242 の外形図からの推定値(アームの太さ 約 120 mm)。厳密な値ではない。
+        /// 注意: 試料を取り付ける板(紙 450×302 mm)の広がりは、この近似に含まれていない。
+        Real arm_radius = 60.0;
     };
 
 } // namespace brdf::geometry

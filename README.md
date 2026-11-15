@@ -50,7 +50,13 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 
 ### What does not exist yet
 
-Real hardware control (the joint limits and arm radius in `RigSetup` are placeholders until checked against the real arms), automated measurement runs, calibration-board processing and BRDF analysis.
+Real hardware control, automated measurement runs, calibration-board processing and BRDF analysis.
+
+## Hardware
+
+- Robot arms: 2 × DENSO **VP-6242** (6-axis) with RC8 controllers. The link dimensions in `geometry::ArmLinks` match the manufacturer's outline drawing, and the joint limits in `geometry::JointLimits` are the factory software-limit values from the VP robot manual.
+- Spectroradiometer: TOPCON SR-5000H.
+- The arm radius used by the clearance check (`RigSetup::arm_radius`) is an estimate from the outline drawing, and it does not include the sample plate.
 
 ## Build and test
 
