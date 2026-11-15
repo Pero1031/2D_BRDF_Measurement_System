@@ -1,61 +1,61 @@
 # 2D BRDF Measurement
 
-A system that measures BRDFs (bidirectional reflectance distribution functions) with two robot arms and a 2D spectroradiometer.
-It is a restructured, generalized and documented rewrite of the previous in-house measurement system.
+ロボットアーム 2 台と 2D 分光放射計で、BRDF(双方向反射率分布関数)を測定するシステムです。
+以前の測定システムを、構造化・汎用化・ドキュメント化して作り直しています。
 
-> **Work in progress.** It currently runs on mocks only; no real hardware is connected yet (see [Status](#status)).
+> **開発中です。** 現在はモックだけで動く段階で、実機は未接続です([現在の状態](#現在の状態))。
 
-## What the system measures
+## 何を測るシステムか
 
 ```
-                  2D spectroradiometer (fixed)
-                              ▲ captures
-   light  ─────────▶  ┌───────────┐
- (left arm tip)       │  sample   │ ◀── held by the right arm tip
-                      └───────────┘
+                       2D 分光放射計 (固定)
+                              ▲ 撮影
+   光源 ───────▶  ┌───────────┐
+ (左アーム先端)    │   試料     │ ◀── 右アーム先端が試料を持つ
+                   └───────────┘
 ```
 
-- The left arm moves the light source, the right arm moves the sample, and a fixed 2D spectroradiometer captures it.
-- The light and the camera are at finite distances, so every point on the sample sees a slightly different incidence and observation direction.
-  A single capture therefore yields spectra for many angle combinations (θi, φi, θo, φo) at once.
-- The input is the **arm poses**; the angle of each point is computed from the poses.
+- 左アームが光源を、右アームが試料を動かし、固定された 2D 分光放射計で撮影します。
+- 光源とカメラは有限の距離にあるので、試料上の点ごとに入射角と観察角が違います。
+  1 回の撮影で、多数の角度の組 (θi, φi, θo, φo) のスペクトルが同時に得られます。
+- 入力は**アームの姿勢**で、各点の角度は姿勢から計算します。
 
-A detailed analysis of the old system is in [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md) (Japanese).
+旧システムの詳しい解析は [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md) にあります。
 
-## Status
+## 現在の状態
 
-| Phase | Content | State |
+| フェーズ | 内容 | 状態 |
 |---|---|---|
-| P0 | Foundation (CMake, tests, folder layout) | Done |
-| P1 | Geometry and angles (forward kinematics, angle computation, check against old data) | Done |
-| P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`) | Next |
-| P3 | Project folders, TOML configuration, measurement session, CLI | Not started |
-| P4 | Calibration board, homography, spot XML | Not started |
-| P5 | Analysis (white-board normalization, BRDF reconstruction) | Not started |
-| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
-| P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
+| P0 | 土台(CMake、テスト、フォルダ構成) | 完了 |
+| P1 | 幾何と角度(順運動学、角度計算、旧データとの照合) | 完了 |
+| P2 | ドライバ v2 とシミュレータ(`ISpectralImager`、`SimulatedRig`) | 次 |
+| P3 | プロジェクトフォルダ、TOML 設定、測定セッション、CLI | 未着手 |
+| P4 | キャリブボード、ホモグラフィ、スポット XML | 未着手 |
+| P5 | 解析(白色板正規化、BRDF 復元) | 未着手 |
+| P6 | 実機ドライバ(DENSO RC8 の b-CAP、TOPCON `hs_api`) | 未着手 |
+| P7 | 使い方・セットアップ手順などの文書 | 未着手 |
 
-The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
+全体の計画は [docs/DesignPlan.md](docs/DesignPlan.md) です。
 
-### What works today
+### 今できること
 
-- Arm tip position and orientation (forward kinematics): `geometry::Rc8Kinematics`
-- World positions of the light, the sample and the camera: `geometry::RigGeometry`
-- Incidence and observation angles of a point on the sample: `optics::computeAngles`
-- A test that reproduces the old system's angle tables (about 350,000 rows)
-- A mock robot arm and a mock spectrometer (`examples/mock_demo.cpp`)
+- アーム先端の位置・姿勢の計算(順運動学): `geometry::Rc8Kinematics`
+- 光源・試料・カメラのワールド座標での位置: `geometry::RigGeometry`
+- 試料上の点の入射角・観察角の計算: `optics::computeAngles`
+- 旧システムの角度表(約 35 万行)と一致することのテスト
+- モックのロボットアームと分光器(`examples/mock_demo.cpp`)
 
-### What does not exist yet
+### まだできないこと
 
-Real hardware control, automated measurement runs, calibration-board processing and BRDF analysis.
+実機の制御、測定の自動実行、キャリブボードの処理、BRDF の解析は、まだありません。
 
-## Build and test
+## ビルドとテスト
 
-Requirements:
+必要なもの:
 
-- Visual Studio 2022 ("Desktop development with C++")
-- CMake 3.25 or later
-- The `vcpkg/` checkout in the repository root (dependencies are declared in `vcpkg.json`)
+- Visual Studio 2022(「C++ によるデスクトップ開発」)
+- CMake 3.25 以上
+- リポジトリ直下の `vcpkg/`(依存ライブラリは `vcpkg.json` で管理)
 
 ```bash
 cmake --preset default
@@ -63,69 +63,69 @@ cmake --build --preset debug
 ctest --preset debug
 ```
 
-- The first `cmake --preset default` takes a long time because vcpkg builds the dependencies (including OpenCV). Later runs take a few seconds.
-- You can also open this folder in Visual Studio with "Open a local folder"; it uses the same presets.
+- 初回の `cmake --preset default` は、vcpkg が依存ライブラリを用意するので時間がかかります(OpenCV を含みます)。2 回目以降は数秒です。
+- Visual Studio で「フォルダーを開く」としてこのフォルダを開いても、同じプリセットで使えます。
 
-Run the mock demo:
+モックのデモ:
 
 ```bash
 build/Debug/brdf_mock_demo.exe
 ```
 
-Compare against every row of the old system's angle tables (not part of the normal test run):
+旧システムの角度表の全行との照合(通常のテストには含まれません):
 
 ```bash
 set BRDF_OLD_ANGLE_TABLE_DIR=D:\Data\AngleTable
 build\tests\Debug\brdf_tests.exe "[.full]"
 ```
 
-## Repository layout
+## フォルダ構成
 
 ```
-include/brdf/   public headers
-  core/           types, matrices, math utilities
-  geometry/       joint angles, forward kinematics, rig layout
-  optics/         incidence / observation angle computation
-  driver/         robot and spectrometer interfaces, and mocks
-  domain/         recipe (to be redesigned in P3)
-src/            implementation
-tests/          unit tests and checks against the old system (tests/data/)
-examples/       demos that run on mocks only
-docs/           analysis, design, plan
-tools/          helper scripts
+include/brdf/   公開ヘッダ
+  core/           型、行列、数学ユーティリティ
+  geometry/       関節角、順運動学、装置の配置
+  optics/         入射角・観察角の計算
+  driver/         ロボット・分光器のインターフェースとモック
+  domain/         レシピ(P3 で再設計予定)
+src/            実装
+tests/          単体テストと、旧システムとの照合テスト(tests/data/)
+examples/       モックだけで動くデモ
+docs/           解析・設計・計画
+tools/          補助スクリプト
 ```
 
-## Coordinate systems and angle conventions
+## 座標系と角度の約束
 
-- World frame: origin = base of the left arm, unit = mm.
-- Angles are measured in a surface frame. θ = angle from the normal (Z axis), φ = angle from the X axis toward the Y axis. Units are radians internally.
-- There are two sample frames and their **φ differs by 90°**. The paper frame is the standard.
+- ワールド座標: 原点 = 左アームの土台、単位 mm。
+- 角度は面の座標系で測ります。θ = 法線(Z 軸)からの角度、φ = X 軸から Y 軸向きの角度。内部の単位はラジアンです。
+- 試料の座標系は 2 種類あり、**φ が 90° ずれます**。標準は紙の座標系です。
 
-| Frame | Axes | Used for |
+| 座標系 | 軸の向き | 用途 |
 |---|---|---|
-| `paperFrame` (standard) | paper X = tip +Y, paper Y = tip −X, paper Z = tip +Z | per-point sample angles |
-| `tipFrame` | the arm tip's X, Y, Z as they are | checking against the old angle tables |
+| `paperFrame`(標準) | 紙 X = 先端の +Y、紙 Y = 先端の −X、紙 Z = 先端の +Z | 試料点ごとの角度 |
+| `tipFrame` | アーム先端の X, Y, Z そのまま | 旧システムの角度表との照合 |
 
-Rig parameters such as the camera position are collected in `geometry::RigSetup`.
-**The camera position changes from one measurement day to the next**, so real measurements must record it in a configuration file (implemented in P3) and store it with the results.
+装置のパラメータ(カメラ位置など)は `geometry::RigSetup` に集約しています。
+**カメラ位置は測定日ごとに変わる値**なので、実際の測定では設定ファイル(P3 で実装)に記録して、結果と一緒に保存します。
 
-## Differences from the old system
+## 旧システムとの違い
 
-- No absolute paths and no constants hard-coded in headers (project folders and TOML instead).
-- Computations are pure functions: no printing, no waiting for input, no `exit()`.
-- The old `calcAngle` bug that flipped φ by 180° when θ > 90° is fixed.
+- 絶対パスと、ヘッダへの定数の直書きをなくします(プロジェクトフォルダと TOML へ)。
+- 計算は表示・入力待ち・`exit()` を持たない純粋関数にします。
+- 旧システムの `calcAngle` の φ 反転バグ(θ>90° のとき)は、新システムでは修正済みです。
 
-## Character encoding
+## 文字コード
 
-Sources are unified to **UTF-8 with BOM and CRLF** (see `.editorconfig`).
+ソースは **UTF-8(BOM 付き)・CRLF** で統一しています(`.editorconfig` 参照)。
 
 ```bash
-python tools/check_encoding.py        # check
-python tools/check_encoding.py --fix  # fix
+python tools/check_encoding.py        # 検査
+python tools/check_encoding.py --fix  # 修正
 ```
 
-## Documentation
+## ドキュメント
 
-- [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md): analysis of the old system and the results of checking against its data (Japanese)
-- [docs/DesignPlan.md](docs/DesignPlan.md): design and development plan (Japanese)
-- [tests/data/README.md](tests/data/README.md): origin of the comparison data (Japanese)
+- [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md): 旧システムの解析と、旧データとの照合結果
+- [docs/DesignPlan.md](docs/DesignPlan.md): 設計と開発計画
+- [tests/data/README.md](tests/data/README.md): 照合用データの由来
