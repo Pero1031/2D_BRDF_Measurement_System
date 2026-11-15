@@ -1,63 +1,131 @@
 # 2D BRDF Measurement
 
-ロボットアーム 2 台(光源側・試料側)と 2D 分光放射計で BRDF を測定するシステムです。
-以前の測定システムを、構造化・汎用化して作り直しています。
+A system that measures BRDFs (bidirectional reflectance distribution functions) with two robot arms and a 2D spectroradiometer.
+It is a restructured, generalized and documented rewrite of the previous in-house measurement system.
 
-- 旧システムの解析: [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md)
-- 設計と開発計画: [docs/DesignPlan.md](docs/DesignPlan.md)
+> **Work in progress.** It currently runs on mocks only; no real hardware is connected yet (see [Status](#status)).
 
-## 現在の状態
+## What the system measures
 
-| フェーズ | 状態 |
-|---|---|
-| P0 土台(CMake・テスト) | 完了 |
-| P1 幾何と角度(順運動学・角度計算・旧データとの照合) | 完了 |
-| P2 以降(ドライバ v2・シミュレータ・CLI …) | 未着手 |
+```
+                  2D spectroradiometer (fixed)
+                              ▲ captures
+   light  ─────────▶  ┌───────────┐
+ (left arm tip)       │  sample   │ ◀── held by the right arm tip
+                      └───────────┘
+```
 
-モックだけで動きます。実機(RC8・TOPCON SR-5000H)のドライバはまだありません。
+- The left arm moves the light source, the right arm moves the sample, and a fixed 2D spectroradiometer captures it.
+- The light and the camera are at finite distances, so every point on the sample sees a slightly different incidence and observation direction.
+  A single capture therefore yields spectra for many angle combinations (θi, φi, θo, φo) at once.
+- The input is the **arm poses**; the angle of each point is computed from the poses.
 
-## ビルドとテスト
+A detailed analysis of the old system is in [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md) (Japanese).
 
-必要なもの: Visual Studio 2022(C++ デスクトップ開発)、CMake 3.25 以上、
-リポジトリ直下の `vcpkg/`(依存ライブラリは `vcpkg.json` で管理)。
+## Status
+
+| Phase | Content | State |
+|---|---|---|
+| P0 | Foundation (CMake, tests, folder layout) | Done |
+| P1 | Geometry and angles (forward kinematics, angle computation, check against old data) | Done |
+| P2 | Driver v2 and simulator (`ISpectralImager`, `SimulatedRig`) | Next |
+| P3 | Project folders, TOML configuration, measurement session, CLI | Not started |
+| P4 | Calibration board, homography, spot XML | Not started |
+| P5 | Analysis (white-board normalization, BRDF reconstruction) | Not started |
+| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | Not started |
+| P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
+
+The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
+
+### What works today
+
+- Arm tip position and orientation (forward kinematics): `geometry::Rc8Kinematics`
+- World positions of the light, the sample and the camera: `geometry::RigGeometry`
+- Incidence and observation angles of a point on the sample: `optics::computeAngles`
+- A test that reproduces the old system's angle tables (about 350,000 rows)
+- A mock robot arm and a mock spectrometer (`examples/mock_demo.cpp`)
+
+### What does not exist yet
+
+Real hardware control, automated measurement runs, calibration-board processing and BRDF analysis.
+
+## Build and test
+
+Requirements:
+
+- Visual Studio 2022 ("Desktop development with C++")
+- CMake 3.25 or later
+- The `vcpkg/` checkout in the repository root (dependencies are declared in `vcpkg.json`)
 
 ```bash
-cmake --preset default            # 初回は vcpkg が依存ライブラリを用意する
+cmake --preset default
 cmake --build --preset debug
 ctest --preset debug
 ```
 
-Visual Studio で「フォルダーを開く」としてこのフォルダを開いても、同じプリセットで使えます。
+- The first `cmake --preset default` takes a long time because vcpkg builds the dependencies (including OpenCV). Later runs take a few seconds.
+- You can also open this folder in Visual Studio with "Open a local folder"; it uses the same presets.
 
-モックのデモ:
+Run the mock demo:
 
 ```bash
 build/Debug/brdf_mock_demo.exe
 ```
 
-旧システムの角度表 全約 35 万行との照合(通常のテストには含まれません):
+Compare against every row of the old system's angle tables (not part of the normal test run):
 
 ```bash
 set BRDF_OLD_ANGLE_TABLE_DIR=D:\Data\AngleTable
 build\tests\Debug\brdf_tests.exe "[.full]"
 ```
 
-## フォルダ構成
+## Repository layout
 
 ```
-include/brdf/   公開ヘッダ     core/ geometry/ optics/ driver/ domain/
-src/            実装
-tests/          単体テストと、旧システムとの照合テスト(tests/data/)
-examples/       モックだけで動くデモ
-docs/           解析・設計・計画
-tools/          補助スクリプト
+include/brdf/   public headers
+  core/           types, matrices, math utilities
+  geometry/       joint angles, forward kinematics, rig layout
+  optics/         incidence / observation angle computation
+  driver/         robot and spectrometer interfaces, and mocks
+  domain/         recipe (to be redesigned in P3)
+src/            implementation
+tests/          unit tests and checks against the old system (tests/data/)
+examples/       demos that run on mocks only
+docs/           analysis, design, plan
+tools/          helper scripts
 ```
 
-## 文字コード
+## Coordinate systems and angle conventions
 
-ソースは **UTF-8(BOM 付き)・CRLF** で統一しています(`.editorconfig` 参照)。
+- World frame: origin = base of the left arm, unit = mm.
+- Angles are measured in a surface frame. θ = angle from the normal (Z axis), φ = angle from the X axis toward the Y axis. Units are radians internally.
+- There are two sample frames and their **φ differs by 90°**. The paper frame is the standard.
+
+| Frame | Axes | Used for |
+|---|---|---|
+| `paperFrame` (standard) | paper X = tip +Y, paper Y = tip −X, paper Z = tip +Z | per-point sample angles |
+| `tipFrame` | the arm tip's X, Y, Z as they are | checking against the old angle tables |
+
+Rig parameters such as the camera position are collected in `geometry::RigSetup`.
+**The camera position changes from one measurement day to the next**, so real measurements must record it in a configuration file (implemented in P3) and store it with the results.
+
+## Differences from the old system
+
+- No absolute paths and no constants hard-coded in headers (project folders and TOML instead).
+- Computations are pure functions: no printing, no waiting for input, no `exit()`.
+- The old `calcAngle` bug that flipped φ by 180° when θ > 90° is fixed.
+
+## Character encoding
+
+Sources are unified to **UTF-8 with BOM and CRLF** (see `.editorconfig`).
 
 ```bash
-python tools/check_encoding.py        # 検査
-python tools/check_encoding.py --fix  # 修正
+python tools/check_encoding.py        # check
+python tools/check_encoding.py --fix  # fix
 ```
+
+## Documentation
+
+- [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md): analysis of the old system and the results of checking against its data (Japanese)
+- [docs/DesignPlan.md](docs/DesignPlan.md): design and development plan (Japanese)
+- [tests/data/README.md](tests/data/README.md): origin of the comparison data (Japanese)
