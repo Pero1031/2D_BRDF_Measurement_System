@@ -5,6 +5,7 @@
 
 #include "brdf/io/SetupConfig.hpp"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -52,6 +53,39 @@ namespace brdf::io {
             if (!positive(c.imager.light_intensity) || !positive(c.imager.focus_tolerance_mm) || c.imager.noise_relative < 0.0) {
                 return fail(ErrorCode::InvalidArgument,
                             "setup: [sim.imager] light_intensity and focus_tolerance_mm must be positive, noise_relative must not be negative");
+            }
+            const auto& cal = c.calibration;
+            if (cal.projector != "camera-model" && cal.projector != "board") {
+                return fail(ErrorCode::InvalidArgument, "setup: [calibration] projector must be \"camera-model\" or \"board\"");
+            }
+            if (cal.projector == "camera-model" && c.mode == DeviceMode::Real) {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [calibration] projector = \"camera-model\" is only for the simulator; real devices need \"board\"");
+            }
+            if (!positive(cal.max_rms_px)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [calibration] max_rms_px must be positive");
+            }
+            const auto& b = cal.board;
+            if (b.columns < 3 || b.rows < 3) {
+                return fail(ErrorCode::InvalidArgument, "setup: [calibration.board] columns and rows must be at least 3");
+            }
+            if (!positive(b.pitch_x) || !positive(b.pitch_y) || !positive(b.paper_width) || !positive(b.paper_height)
+                || !positive(b.circle_diameter)) {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [calibration.board] pitch, paper size and circle_diameter must be positive");
+            }
+            if (b.circle_diameter >= std::min(b.pitch_x, b.pitch_y)) {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [calibration.board] circle_diameter must be smaller than the pitch");
+            }
+            const Real last_x = b.first_x + (b.columns - 1) * b.pitch_x;
+            const Real last_y = b.first_y + (b.rows - 1) * b.pitch_y;
+            if (b.first_x < 0.0 || b.first_y < 0.0 || last_x > b.paper_width || last_y > b.paper_height) {
+                return fail(ErrorCode::InvalidArgument,
+                            "setup: [calibration.board] the circles do not fit on the paper (check first_x, first_y, pitch, columns, rows)");
+            }
+            if (auto m = cal.mapping(); !m) {
+                return fail(ErrorCode::InvalidArgument, "setup: [calibration.board] " + m.error().message);
             }
             if (c.sample.model != "lambert" && c.sample.model != "phong") {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.sample] model must be \"lambert\" or \"phong\"");
@@ -121,6 +155,36 @@ namespace brdf::io {
             BRDF_TRY(rig->vec3("camera_position", c.rig.camera_position));
             BRDF_TRY(rig->number("sample_surface_offset", c.rig.sample_surface_offset));
             BRDF_TRY(rig->finish());
+        }
+
+        // --- [calibration], [calibration.board] ---
+        {
+            auto cal = top.child("calibration");
+            if (!cal) return tl::unexpected(cal.error());
+            BRDF_TRY(cal->string("projector", c.calibration.projector));
+            BRDF_TRY(cal->number("max_rms_px", c.calibration.max_rms_px));
+
+            auto board = cal->child("board");
+            if (!board) return tl::unexpected(board.error());
+            auto& b = c.calibration.board;
+            BRDF_TRY(board->integer("columns", b.columns));
+            BRDF_TRY(board->integer("rows", b.rows));
+            BRDF_TRY(board->number("pitch_x", b.pitch_x));
+            BRDF_TRY(board->number("pitch_y", b.pitch_y));
+            BRDF_TRY(board->number("first_x", b.first_x));
+            BRDF_TRY(board->number("first_y", b.first_y));
+            BRDF_TRY(board->number("paper_width", b.paper_width));
+            BRDF_TRY(board->number("paper_height", b.paper_height));
+            BRDF_TRY(board->number("circle_diameter", b.circle_diameter));
+            BRDF_TRY(board->string("board_u", c.calibration.board_u));
+            BRDF_TRY(board->string("board_v", c.calibration.board_v));
+            if (board->has("sample_origin")) {
+                Vec2 sample_origin = Vec2::Zero();
+                BRDF_TRY(board->vec2("sample_origin", sample_origin));
+                c.calibration.sample_origin = sample_origin;
+            }
+            BRDF_TRY(board->finish());
+            BRDF_TRY(cal->finish());
         }
 
         // --- [sim.*] ---
@@ -220,6 +284,32 @@ namespace brdf::io {
           << "light_offset = " << arr3(c.rig.light_offset) << "   # 左アーム先端の座標系で見た光源の位置\n"
           << "camera_position = " << arr3(c.rig.camera_position) << "   # 2D分光放射計の位置\n"
           << "sample_surface_offset = " << num(c.rig.sample_surface_offset) << "   # 右アーム先端から試料面まで(アクリル 5 + 紙 1)\n\n";
+
+        const auto& cal = c.calibration;
+        const auto& bd = cal.board;
+        o << "[calibration]\n"
+          << "projector = " << quote(cal.projector)
+          << "   # \"camera-model\" = シミュレータのカメラで直接(sim のみ)、\"board\" = キャリブボードのホモグラフィ(実機)\n"
+          << "max_rms_px = " << num(cal.max_rms_px) << "   # 校正の再投影誤差(rms)の許容値\n\n";
+
+        o << "[calibration.board]   # キャリブボード(黒円の格子)。座標は紙の角が原点、mm\n"
+          << "columns = " << bd.columns << "\n"
+          << "rows = " << bd.rows << "\n"
+          << "pitch_x = " << num(bd.pitch_x) << "\n"
+          << "pitch_y = " << num(bd.pitch_y) << "\n"
+          << "first_x = " << num(bd.first_x) << "   # 最初の円の中心(座標が最小の円)\n"
+          << "first_y = " << num(bd.first_y) << "\n"
+          << "paper_width = " << num(bd.paper_width) << "\n"
+          << "paper_height = " << num(bd.paper_height) << "\n"
+          << "circle_diameter = " << num(bd.circle_diameter) << "\n";
+        o << "board_u = " << quote(cal.board_u) << "   # ボードを正面から見て右向きの軸は、試料座標のどの軸か(\"+x\" \"-x\" \"+y\" \"-y\")\n"
+          << "board_v = " << quote(cal.board_v) << "   # 同、下向きの軸\n";
+        if (cal.sample_origin) {
+            o << "sample_origin = [" << num(cal.sample_origin->x()) << ", " << num(cal.sample_origin->y()) << "]\n";
+        } else {
+            o << "# sample_origin = [225.0, 151.0]   # 試料座標の原点がボード座標のどこか。省略すると紙の中心\n";
+        }
+        o << "\n";
 
         o << "# ---- ここから下はシミュレーション(mode = \"sim\")のときだけ使う設定 ----\n\n";
 

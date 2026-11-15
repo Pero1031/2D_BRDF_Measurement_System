@@ -13,8 +13,18 @@
 #include "brdf/app/Preflight.hpp"
 #include "brdf/core/Error.hpp"
 #include "brdf/domain/Recipe.hpp"
+#include "brdf/io/SetupConfig.hpp"
 
 namespace brdf::app {
+
+    /// プロジェクトフォルダから読み込んだ設定とレシピ。
+    struct LoadedProject {
+        io::SetupConfig setup;
+        domain::Recipe recipe;
+    };
+
+    /// setup.toml と recipe.toml を読む。
+    Result<LoadedProject> loadProject(const std::filesystem::path& dir);
 
     /// 現在時刻を "20261116_153000" の形で返す。
     std::string currentTimestamp();

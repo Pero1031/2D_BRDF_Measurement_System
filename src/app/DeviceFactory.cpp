@@ -46,8 +46,16 @@ namespace brdf::app {
         Devices d;
         d.left_arm = std::make_shared<sim::MockRobotArm>("LightArm", rig, sim::ArmSide::Left);
         d.right_arm = std::make_shared<sim::MockRobotArm>("SampleArm", rig, sim::ArmSide::Right);
-        d.imager = std::make_shared<sim::MockSpectralImager>(rig, makeBrdf(setup.sample), setup.imager);
-        d.projector = std::make_shared<sim::CameraSpotProjector>(rig);
+        auto imager = std::make_shared<sim::MockSpectralImager>(rig, makeBrdf(setup.sample), setup.imager);
+        auto mapping = setup.calibration.mapping();
+        if (!mapping) return tl::unexpected(mapping.error());
+        imager->setCalibrationBoard({setup.calibration.board, *mapping});
+        d.imager = imager;
+
+        // "board" のときは、校正結果(ホモグラフィ)を読み込んだ側が projector を設定する
+        if (setup.calibration.projector == "camera-model") {
+            d.projector = std::make_shared<sim::CameraSpotProjector>(rig);
+        }
         return d;
     }
 

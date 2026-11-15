@@ -9,6 +9,7 @@
 
 #include "brdf/core/Algebra.hpp"
 #include "brdf/core/Error.hpp"
+#include "brdf/core/Image.hpp"
 
 namespace brdf::driver {
 
@@ -51,6 +52,12 @@ namespace brdf::driver {
         Real measure_distance_mm = 0.0;        ///< 実際に使った測定距離
     };
 
+    /// 明るさの画像 1 枚の撮影の要求。キャリブボードの撮影に使う。
+    struct ImageRequest {
+        Real measure_distance_mm = 1000.0;     ///< カメラから試料までの距離(ピント合わせに使う)
+        Real integration_time_ms = 100.0;      ///< 積分時間
+    };
+
     /// 2D 分光放射計のインターフェース。実機(TOPCON SR-5000H)とモックが実装する。
     class ISpectralImager {
     public:
@@ -62,6 +69,10 @@ namespace brdf::driver {
 
         /// 撮影して、指定した点のスペクトルを返す。完了してから戻る(ブロッキング)。
         virtual Result<CaptureResult> capture(const CaptureRequest& request) = 0;
+
+        /// 明るさだけの画像を撮影する(キャリブボードの円の検出用)。
+        /// 実機では、高速な XYZ 測定モードの Y(輝度)を使う想定。分光測定より速く、データ量も少ない。
+        virtual Result<GrayImage> captureImage(const ImageRequest& request) = 0;
     };
 
 } // namespace brdf::driver

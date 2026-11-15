@@ -41,6 +41,16 @@ namespace {
         CHECK_THAT(a.imager.noise_relative, WithinAbs(b.imager.noise_relative, 1e-12));
         CHECK(a.imager.seed == b.imager.seed);
         CHECK_THAT(a.imager.focus_tolerance_mm, WithinAbs(b.imager.focus_tolerance_mm, 1e-9));
+        CHECK(a.calibration.projector == b.calibration.projector);
+        CHECK_THAT(a.calibration.max_rms_px, WithinAbs(b.calibration.max_rms_px, 1e-12));
+        CHECK(a.calibration.board.columns == b.calibration.board.columns);
+        CHECK(a.calibration.board.rows == b.calibration.board.rows);
+        CHECK_THAT(a.calibration.board.pitch_x, WithinAbs(b.calibration.board.pitch_x, 1e-12));
+        CHECK_THAT(a.calibration.board.first_y, WithinAbs(b.calibration.board.first_y, 1e-12));
+        CHECK_THAT(a.calibration.board.circle_diameter, WithinAbs(b.calibration.board.circle_diameter, 1e-12));
+        CHECK_THAT((a.calibration.sampleOrigin() - b.calibration.sampleOrigin()).norm(), WithinAbs(0.0, 1e-12));
+        CHECK(a.calibration.board_u == b.calibration.board_u);
+        CHECK(a.calibration.board_v == b.calibration.board_v);
         CHECK(a.sample.model == b.sample.model);
         CHECK_THAT(a.sample.peak_nm, WithinAbs(b.sample.peak_nm, 1e-9));
         CHECK_THAT(a.sample.width_nm, WithinAbs(b.sample.width_nm, 1e-9));
@@ -67,6 +77,12 @@ TEST_CASE("the default setup survives a write/read round trip", "[config]") {
 TEST_CASE("a modified setup survives a write/read round trip", "[config]") {
     SetupConfig c;
     c.mode = DeviceMode::Real;
+    c.calibration.projector = "board";                 // 実機はボード方式が必須
+    c.calibration.max_rms_px = 1.5;
+    c.calibration.board = calibration::BoardLayout::legacy2020();
+    c.calibration.sample_origin = Vec2(120.5, 80.25);
+    c.calibration.board_u = "-y";
+    c.calibration.board_v = "+x";
     c.rig.camera_position = Vec3(1272.5, 710.25, 554.0);
     c.rig.right_base_position = Vec3(10, 950, -5);
     c.rig.arm_radius = 55.5;
@@ -130,6 +146,17 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
         CHECK_THAT(errorOf("[arm]\nradius_mm = -1\n"), ContainsSubstring("radius_mm"));
         CHECK_THAT(errorOf("[arm.links]\nwrist = 0\n"), ContainsSubstring("link length"));
         CHECK_THAT(errorOf("[sim.camera]\nimage_width = 0\n"), ContainsSubstring("image_width"));
+    }
+    SECTION("calibration settings") {
+        CHECK_THAT(errorOf("[calibration]\nprojector = \"magic\"\n"), ContainsSubstring("camera-model"));
+        CHECK_THAT(errorOf("[devices]\nmode = \"real\"\n"), ContainsSubstring("only for the simulator"));   // 実機に camera-model は不可
+        CHECK_THAT(errorOf("[calibration]\nmax_rms_px = 0\n"), ContainsSubstring("max_rms_px"));
+        CHECK_THAT(errorOf("[calibration.board]\ncolumns = 2\n"), ContainsSubstring("at least 3"));
+        CHECK_THAT(errorOf("[calibration.board]\ncircle_diameter = 30\n"), ContainsSubstring("smaller than the pitch"));
+        CHECK_THAT(errorOf("[calibration.board]\ncolumns = 30\n"), ContainsSubstring("do not fit on the paper"));
+        CHECK_THAT(errorOf("[calibration.board]\npitch_xx = 25\n"), ContainsSubstring("unknown key 'pitch_xx'"));
+        CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"up\"\n"), ContainsSubstring("board_u"));
+        CHECK_THAT(errorOf("[calibration.board]\nboard_u = \"+x\"\nboard_v = \"-x\"\n"), ContainsSubstring("different axes"));
     }
     SECTION("unknown sample model") {
         CHECK_THAT(errorOf("[sim.sample]\nmodel = \"mirror\"\n"), ContainsSubstring("lambert"));

@@ -8,6 +8,11 @@
 #include <cstdint>
 #include <memory>
 
+#include <optional>
+#include <utility>
+
+#include "brdf/calibration/BoardLayout.hpp"
+#include "brdf/calibration/SampleToBoard.hpp"
 #include "brdf/driver/ISpectralImager.hpp"
 #include "brdf/sim/BrdfModel.hpp"
 #include "brdf/sim/SimulatedRig.hpp"
@@ -19,6 +24,13 @@ namespace brdf::sim {
         Real noise_relative = 0.0;           ///< ノイズの標準偏差(信号に対する割合)。0 ならノイズなし
         std::uint32_t seed = 12345;          ///< ノイズの乱数シード(同じシードなら同じ結果)
         Real focus_tolerance_mm = 20.0;      ///< 要求した測定距離と実際の距離の許容差。超えるとピントエラー
+    };
+
+    /// 試料面に取り付けられたキャリブボード。試料と同じ平面にある。
+    struct SimCalibrationBoard {
+        calibration::BoardLayout layout;
+        /// ボードの取り付け方(試料座標 → ボード座標)。
+        calibration::SampleToBoard mapping;
     };
 
     /// シミュレーション用の 2D 分光放射計。
@@ -40,10 +52,17 @@ namespace brdf::sim {
 
         Result<driver::CaptureResult> capture(const driver::CaptureRequest& request) override;
 
+        /// キャリブボードを試料面に取り付けたことにする。captureImage はこのボードを描く。
+        void setCalibrationBoard(SimCalibrationBoard board) { board_ = std::move(board); }
+
+        /// ボードを撮影した画像を描く: 紙は明るく、黒円は暗く、紙の外は暗い背景。
+        Result<GrayImage> captureImage(const driver::ImageRequest& request) override;
+
     private:
         std::shared_ptr<const SimulatedRig> rig_;
         std::shared_ptr<const IBrdfModel> brdf_;
         MockImagerOptions options_;
+        std::optional<SimCalibrationBoard> board_;
         bool connected_ = false;
         std::uint32_t capture_count_ = 0;   // 撮影ごとに乱数を変えるため
     };

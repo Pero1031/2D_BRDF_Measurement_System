@@ -17,7 +17,7 @@ namespace brdf::app {
     ///   <project>/
     ///     setup.toml         装置の配置
     ///     recipe.toml        測定の手順書
-    ///     calibration/       キャリブボードのデータ(P4)
+    ///     calibration/       キャリブボードの撮影画像(images/)と、ポーズごとのホモグラフィ(homographies.csv)
     ///     result/<日時>_<種類>/   実行ごとの結果
     ///
     /// プログラムが受け取るパスはプロジェクトフォルダだけ。設定ファイルの中に絶対パスは書かない。
@@ -29,6 +29,8 @@ namespace brdf::app {
         std::filesystem::path setupFile() const { return root_ / "setup.toml"; }
         std::filesystem::path recipeFile() const { return root_ / "recipe.toml"; }
         std::filesystem::path calibrationDir() const { return root_ / "calibration"; }
+        std::filesystem::path calibrationFile() const { return calibrationDir() / "homographies.csv"; }
+        std::filesystem::path calibrationImagesDir() const { return calibrationDir() / "images"; }
         std::filesystem::path resultRoot() const { return root_ / "result"; }
 
         /// フォルダ(calibration / result)を作る。既にあれば何もしない。

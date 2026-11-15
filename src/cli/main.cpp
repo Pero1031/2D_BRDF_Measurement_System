@@ -4,6 +4,7 @@
 *
 *   brdf init  <dir>                         プロジェクトフォルダとひな型を作る
 *   brdf check <dir>                         実機を動かさずに可動域・干渉・角度を検査する
+*   brdf calibrate <dir>                     キャリブボードを撮影して、ポーズごとのホモグラフィを求める
 *   brdf run   <dir> [--kind K] [--yes]      測定を実行して結果を保存する
 *   brdf angles <dir>                        角度だけを出力する
 *   brdf import-poses <csv> [--out F]        旧システムのポーズ CSV から recipe.toml を作る
@@ -15,6 +16,7 @@
 #include <CLI/CLI.hpp>
 #include <spdlog/spdlog.h>
 
+#include "brdf/app/Calibrate.hpp"
 #include "brdf/app/Commands.hpp"
 
 #ifndef BRDF_VERSION
@@ -60,6 +62,15 @@ int main(int argc, char** argv) {
         brdf::app::logReport(*r);
         spdlog::info("Check finished: {} error(s), {} warning(s)", r->errorCount(), r->warningCount());
         if (!r->ok()) exit_code = 2;
+    });
+
+    // --- calibrate ---
+    std::string calib_dir;
+    auto* calibrate = app.add_subcommand("calibrate", "Photograph the calibration board at every pose and compute the homographies");
+    calibrate->add_option("dir", calib_dir, "project folder")->required();
+    calibrate->callback([&] {
+        auto r = brdf::app::calibrateProject(calib_dir);
+        if (!r) { exit_code = reportError(r.error()); return; }
     });
 
     // --- run ---

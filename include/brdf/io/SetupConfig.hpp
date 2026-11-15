@@ -10,6 +10,8 @@
 #include <string>
 #include <string_view>
 
+#include "brdf/calibration/BoardLayout.hpp"
+#include "brdf/calibration/SampleToBoard.hpp"
 #include "brdf/core/Error.hpp"
 #include "brdf/geometry/RigSetup.hpp"
 #include "brdf/sim/MockSpectralImager.hpp"
@@ -40,11 +42,43 @@ namespace brdf::io {
         Real shininess = 50.0;           ///< phong: 鋭さ
     };
 
+    /// 試料面の点を画像上の位置に直す方式と、キャリブボードの設定。
+    struct CalibrationConfig {
+        /// "camera-model": シミュレータのカメラモデルで直接求める(sim のみ。校正は不要)
+        /// "board"       : キャリブボードの撮影から求めたホモグラフィを使う(実機はこちら)
+        std::string projector = "camera-model";
+
+        calibration::BoardLayout board = calibration::BoardLayout::legacy2023();
+
+        /// 試料座標の原点(右アーム先端のクロスヘア)が、ボード座標のどこにあるか [mm]。省略すると紙の中心。
+        std::optional<Vec2> sample_origin;
+
+        /// ボードの取り付け方。ボードを正面(カメラ側)から見て、右向きの軸 u・下向きの軸 v が、
+        /// 試料座標(紙の座標系)のどの軸に当たるか: "+x" "-x" "+y" "-y"。
+        /// 既定値(u = +x, v = -y)は、シミュレータのカメラから見た向き(試料の Y 軸が上向き)に合わせてある。
+        /// 実機では、ボードの取り付け方に合わせて設定する。
+        std::string board_u = "+x";
+        std::string board_v = "-y";
+
+        /// ホモグラフィの再投影誤差(rms)の許容値 [pixel]。超えた校正は失敗として扱う。
+        Real max_rms_px = 3.0;
+
+        Vec2 sampleOrigin() const {
+            return sample_origin ? *sample_origin : Vec2(board.paper_width * 0.5, board.paper_height * 0.5);
+        }
+
+        /// 試料座標 → ボード座標。board_u / board_v が正しくなければエラー(設定の読み込み時に検査される)。
+        Result<calibration::SampleToBoard> mapping() const {
+            return calibration::SampleToBoard::make(board_u, board_v, sampleOrigin());
+        }
+    };
+
     /// setup.toml の内容。旧システムでヘッダに直書きしていた装置の定数をここに集める。
     struct SetupConfig {
         DeviceMode mode = DeviceMode::Sim;
         geometry::RigSetup rig;
         SimCameraConfig camera;
+        CalibrationConfig calibration;
         sim::MockImagerOptions imager;
         SimSampleConfig sample;
     };

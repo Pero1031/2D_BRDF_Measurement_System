@@ -13,6 +13,7 @@
 #include "brdf/calibration/BoardLayout.hpp"
 #include "brdf/calibration/Homography.hpp"
 #include "brdf/calibration/HomographySpotProjector.hpp"
+#include "brdf/calibration/SampleToBoard.hpp"
 #include "brdf/core/MathUtils.hpp"
 #include "brdf/vision/CircleGridDetector.hpp"
 #include "brdf/vision/HomographyFit.hpp"
@@ -133,6 +134,39 @@ TEST_CASE("BoardLayout: the legacy boards", "[calibration]") {
     }
 }
 
+TEST_CASE("SampleToBoard: how the board is mounted", "[calibration]") {
+    SECTION("identity: u = +x, v = +y") {
+        const auto m = SampleToBoard::make("+x", "+y", Vec2(100, 50));
+        REQUIRE(m.has_value());
+        CHECK_THAT((m->apply(Vec2(10, 20)) - Vec2(110, 70)).norm(), WithinAbs(0.0, 1e-12));
+    }
+    SECTION("the simulator's view: sample Y points up in the image, so v = -y (a mirror)") {
+        const auto m = SampleToBoard::make("+x", "-y", Vec2(225, 151));
+        REQUIRE(m.has_value());
+        CHECK_THAT((m->apply(Vec2(10, 20)) - Vec2(235, 131)).norm(), WithinAbs(0.0, 1e-12));
+    }
+    SECTION("axes swapped, as in the previous system's code (x and y were exchanged)") {
+        const auto m = SampleToBoard::make("+y", "+x", Vec2(0, 0));
+        REQUIRE(m.has_value());
+        CHECK_THAT((m->apply(Vec2(10, 20)) - Vec2(20, 10)).norm(), WithinAbs(0.0, 1e-12));
+    }
+    SECTION("inverse undoes apply for every valid mounting") {
+        for (const char* u : {"+x", "-x", "+y", "-y"}) {
+            for (const char* v : {"+x", "-x", "+y", "-y"}) {
+                const auto m = SampleToBoard::make(u, v, Vec2(30, -7));
+                if (!m) continue;   // 同じ軸の組み合わせは作れない
+                const Vec2 s(12.5, -3.25);
+                CHECK_THAT((m->inverse(m->apply(s)) - s).norm(), WithinAbs(0.0, 1e-12));
+            }
+        }
+    }
+    SECTION("invalid axes") {
+        CHECK_THAT(SampleToBoard::make("up", "+y", Vec2::Zero()).error().message, ContainsSubstring("board_u"));
+        CHECK_THAT(SampleToBoard::make("+x", "down", Vec2::Zero()).error().message, ContainsSubstring("board_v"));
+        CHECK_THAT(SampleToBoard::make("+x", "-x", Vec2::Zero()).error().message, ContainsSubstring("different axes"));
+    }
+}
+
 TEST_CASE("Homography: apply and inverse", "[calibration]") {
     const Homography h = makeHomography(25.0);
     const auto inv = h.inverse();
@@ -194,7 +228,9 @@ TEST_CASE("HomographySpotProjector: board coordinates, per-pose homographies and
                 0, 3, 0,
                 0, 0, 1;
 
-    HomographySpotProjector proj(Vec2(100, 50), 1376, 1024);   // 試料座標の原点は、ボード座標 (100, 50)
+    SampleToBoard mapping;
+    mapping.origin = Vec2(100, 50);                            // 試料座標の原点は、ボード座標 (100, 50)
+    HomographySpotProjector proj(mapping, 1376, 1024);
     proj.setHomography("A", h);
     CHECK(proj.has("A"));
     CHECK_FALSE(proj.has("B"));

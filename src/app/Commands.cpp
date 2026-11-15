@@ -16,6 +16,8 @@
 #include "brdf/app/DeviceFactory.hpp"
 #include "brdf/app/MeasurementSession.hpp"
 #include "brdf/app/ProjectLayout.hpp"
+#include "brdf/calibration/HomographySpotProjector.hpp"
+#include "brdf/io/CalibrationFile.hpp"
 #include "brdf/app/ResultFiles.hpp"
 #include "brdf/io/RecipeFile.hpp"
 #include "brdf/io/SetupConfig.hpp"
@@ -38,17 +40,29 @@ namespace brdf::app {
             return {};
         }
 
-        struct Loaded {
-            io::SetupConfig setup;
-            domain::Recipe recipe;
-        };
+        // キャリブボードの校正結果から、ポーズごとのホモグラフィで投影する SpotProjector を作る。
+        // レシピの全ポーズに校正結果がなければ、何も動かす前にエラーにする。
+        Result<std::shared_ptr<calibration::HomographySpotProjector>> loadBoardProjector(
+            const ProjectLayout& layout, const LoadedProject& project) {
+            auto loaded = io::loadCalibration(layout.calibrationFile());
+            if (!loaded) return tl::unexpected(loaded.error());
 
-        Result<Loaded> loadProject(const ProjectLayout& layout) {
-            auto setup = io::loadSetup(layout.setupFile());
-            if (!setup) return tl::unexpected(setup.error());
-            auto recipe = io::loadRecipe(layout.recipeFile());
-            if (!recipe) return tl::unexpected(recipe.error());
-            return Loaded{std::move(*setup), std::move(*recipe)};
+            auto mapping = project.setup.calibration.mapping();
+            if (!mapping) return tl::unexpected(mapping.error());
+            auto projector = std::make_shared<calibration::HomographySpotProjector>(
+                *mapping, project.setup.camera.image_width, project.setup.camera.image_height);
+            for (const io::PoseCalibration& c : *loaded) projector->setHomography(c.pose_id, c.homography);
+
+            std::string missing;
+            for (const domain::PoseStep& pose : project.recipe.poses) {
+                if (!projector->has(pose.id)) missing += (missing.empty() ? "" : ", ") + ("\"" + pose.id + "\"");
+            }
+            if (!missing.empty()) {
+                return fail(ErrorCode::InvalidArgument,
+                            "no calibration for pose(s) " + missing + " in " + layout.calibrationFile().string()
+                            + "; run `brdf calibrate`");
+            }
+            return projector;
         }
 
     } // namespace
@@ -97,6 +111,15 @@ namespace brdf::app {
         return r;
     }
 
+    Result<LoadedProject> loadProject(const fs::path& dir) {
+        const ProjectLayout layout(dir);
+        auto setup = io::loadSetup(layout.setupFile());
+        if (!setup) return tl::unexpected(setup.error());
+        auto recipe = io::loadRecipe(layout.recipeFile());
+        if (!recipe) return tl::unexpected(recipe.error());
+        return LoadedProject{std::move(*setup), std::move(*recipe)};
+    }
+
     void logReport(const PreflightReport& report) {
         for (const Issue& i : report.issues) {
             const std::string where = "pose " + std::to_string(i.pose_index + 1) + " (\"" + i.pose_id + "\")";
@@ -123,15 +146,25 @@ namespace brdf::app {
     }
 
     Result<PreflightReport> checkProject(const fs::path& dir) {
-        auto loaded = loadProject(ProjectLayout(dir));
+        auto loaded = loadProject(dir);
         if (!loaded) return tl::unexpected(loaded.error());
-        return preflight(geometry::RigGeometry(loaded->setup.rig), loaded->recipe);
+        PreflightReport report = preflight(geometry::RigGeometry(loaded->setup.rig), loaded->recipe);
+
+        // ボードで投影する設定なら、全ポーズに校正結果があることも確認する
+        if (loaded->setup.calibration.projector == "board") {
+            auto projector = loadBoardProjector(ProjectLayout(dir), *loaded);
+            if (!projector) {
+                report.issues.push_back({Severity::Error, 0, loaded->recipe.poses.front().id,
+                                         projector.error().code, projector.error().message});
+            }
+        }
+        return report;
     }
 
     Result<fs::path> runProject(const fs::path& dir, const RunOptions& options, std::istream& in) {
         const ProjectLayout layout(dir);
 
-        auto loaded = loadProject(layout);
+        auto loaded = loadProject(dir);
         if (!loaded) return tl::unexpected(loaded.error());
         io::SetupConfig& setup = loaded->setup;
         domain::Recipe& recipe = loaded->recipe;
@@ -147,9 +180,14 @@ namespace brdf::app {
                         + " error(s); nothing was moved. Run `brdf check` for details");
         }
 
-        // 2. 装置の組み立て(real のときはここでエラーになる)
+        // 2. 装置の組み立て(real のときはここでエラーになる)と、画像上の位置への変換
         auto devices = makeDevices(setup);
         if (!devices) return tl::unexpected(devices.error());
+        if (setup.calibration.projector == "board") {
+            auto projector = loadBoardProjector(layout, *loaded);
+            if (!projector) return tl::unexpected(projector.error());
+            devices->projector = *projector;
+        }
 
         // 3. 測定前の確認(旧システムの「準備はできましたか → OK」)
         if (!options.assume_yes && !recipe.checklist.empty()) {
@@ -210,7 +248,7 @@ namespace brdf::app {
 
     Result<fs::path> exportAngles(const fs::path& dir, const std::string& timestamp) {
         const ProjectLayout layout(dir);
-        auto loaded = loadProject(layout);
+        auto loaded = loadProject(dir);
         if (!loaded) return tl::unexpected(loaded.error());
 
         const geometry::RigGeometry geometry(loaded->setup.rig);

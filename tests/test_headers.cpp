@@ -32,6 +32,15 @@
 #include "brdf/app/ResultFiles.hpp"
 #include "brdf/app/ProjectLayout.hpp"
 #include "brdf/app/Commands.hpp"
+#include "brdf/core/Image.hpp"
+#include "brdf/calibration/BoardLayout.hpp"
+#include "brdf/calibration/Homography.hpp"
+#include "brdf/calibration/HomographySpotProjector.hpp"
+#include "brdf/io/CalibrationFile.hpp"
+#include "brdf/vision/ImageIO.hpp"
+#include "brdf/vision/HomographyFit.hpp"
+#include "brdf/vision/CircleGridDetector.hpp"
+#include "brdf/app/Calibrate.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

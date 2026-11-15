@@ -11,10 +11,13 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/core.hpp>
 
+#include "OpenCvQuiet.hpp"
+
 namespace brdf::vision {
 
     Result<HomographyFit> fitHomography(const std::vector<Vec2>& board_points,
                                         const std::vector<Vec2>& image_points) {
+        detail::quietOpenCv();
         if (board_points.size() != image_points.size()) {
             return fail(ErrorCode::InvalidArgument, "homography: the two point lists have different lengths");
         }

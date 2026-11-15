@@ -10,21 +10,22 @@
 
 #include "brdf/app/SpotProjector.hpp"
 #include "brdf/calibration/Homography.hpp"
+#include "brdf/calibration/SampleToBoard.hpp"
 
 namespace brdf::calibration {
 
     /// 試料面の点 → 画像上の位置を、ポーズごとのホモグラフィで求める。実機で使う方式。
     ///
-    ///   ボード座標 = 試料座標 + sample_origin_in_board
+    ///   ボード座標 = SampleToBoard(試料座標)     ← ボードの取り付け方(軸の向きと原点)
     ///   pixel      = H(ポーズ) · ボード座標
     ///
-    /// 前提: キャリブボードと試料は同じ平面にあり、ボードの X/Y 軸は試料座標(紙の座標系)の X/Y 軸と同じ向き。
+    /// 前提: キャリブボードと試料は同じ平面にある。
     class HomographySpotProjector : public app::SpotProjector {
     public:
-        /// sample_origin_in_board: 試料座標の原点(右アーム先端のクロスヘア)が、ボード座標のどこにあるか [mm]。
+        /// mapping: ボードの取り付け方(試料座標 → ボード座標)。
         /// image_width / image_height: 画像の大きさ。範囲外に出る点はエラーにする。
-        HomographySpotProjector(Vec2 sample_origin_in_board, int image_width, int image_height)
-            : origin_(sample_origin_in_board), width_(image_width), height_(image_height) {}
+        HomographySpotProjector(SampleToBoard mapping, int image_width, int image_height)
+            : mapping_(mapping), width_(image_width), height_(image_height) {}
 
         void setHomography(const std::string& pose_id, const Homography& h) { by_pose_[pose_id] = h; }
         bool has(const std::string& pose_id) const { return by_pose_.contains(pose_id); }
@@ -33,7 +34,7 @@ namespace brdf::calibration {
         Result<Vec2> pixelFor(const app::SpotQuery& query) const override;
 
     private:
-        Vec2 origin_;
+        SampleToBoard mapping_;
         int width_;
         int height_;
         std::map<std::string, Homography> by_pose_;

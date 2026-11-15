@@ -242,6 +242,7 @@ TEST_CASE("run in real mode fails clearly and saves nothing", "[commands]") {
     const fs::path dir = tmp.path / "p";
     REQUIRE(initProject(dir).has_value());
     replaceInFile(dir / "setup.toml", "mode = \"sim\"", "mode = \"real\"");
+    replaceInFile(dir / "setup.toml", "projector = \"camera-model\"", "projector = \"board\"");   // 実機はボード方式が必須
 
     std::istringstream in;
     const auto r = runProject(dir, yes(), in);

@@ -12,6 +12,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/features2d.hpp>
 
+#include "OpenCvQuiet.hpp"
 #include "brdf/vision/HomographyFit.hpp"
 
 namespace brdf::vision {
@@ -57,6 +58,7 @@ namespace brdf::vision {
     Result<std::vector<Vec2>> detectCircleGrid(const GrayImage& image,
                                                const calibration::BoardLayout& layout,
                                                const DetectorOptions& options) {
+        detail::quietOpenCv();
         if (image.empty() || image.pixels.size() != static_cast<std::size_t>(image.width) * image.height) {
             return fail(ErrorCode::InvalidArgument, "circle detection: the image is empty or inconsistent");
         }

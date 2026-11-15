@@ -38,6 +38,7 @@ add_library(brdf_core
     src/sim/CameraSpotProjector.cpp
     src/io/SetupConfig.cpp
     src/io/RecipeFile.cpp
+    src/io/CalibrationFile.cpp
     src/app/AngleTable.cpp
     src/app/Preflight.cpp
     src/app/MeasurementSession.cpp
@@ -47,6 +48,7 @@ add_library(brdf_core
     src/app/Commands.cpp
     src/calibration/BoardLayout.cpp
     src/calibration/Homography.cpp
+    src/calibration/SampleToBoard.cpp
     src/calibration/HomographySpotProjector.cpp
 )
 add_library(brdf::core ALIAS brdf_core)
@@ -70,6 +72,7 @@ add_library(brdf_vision
     src/vision/ImageIO.cpp
     src/vision/HomographyFit.cpp
     src/vision/CircleGridDetector.cpp
+    src/vision/Calibrate.cpp
 )
 add_library(brdf::vision ALIAS brdf_vision)
 target_include_directories(brdf_vision PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)

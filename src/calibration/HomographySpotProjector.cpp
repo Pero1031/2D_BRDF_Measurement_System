@@ -16,7 +16,7 @@ namespace brdf::calibration {
                         "no calibration (homography) for pose \"" + query.pose_id + "\"; run `brdf calibrate` first");
         }
 
-        const Vec2 pixel = it->second.apply(query.sample_mm + origin_);
+        const Vec2 pixel = it->second.apply(mapping_.apply(query.sample_mm));
         if (std::isnan(pixel.x()) || std::isnan(pixel.y())) {
             return fail(ErrorCode::OutOfRange, "the point cannot be projected (the homography is degenerate)");
         }

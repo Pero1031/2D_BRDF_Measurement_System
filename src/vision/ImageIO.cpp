@@ -11,9 +11,12 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#include "OpenCvQuiet.hpp"
+
 namespace brdf::vision {
 
     Result<GrayImage> loadGrayImage(const std::filesystem::path& path) {
+        detail::quietOpenCv();
         // パスに日本語が含まれても読めるよう、ファイルを自分で読んでからデコードする
         std::ifstream ifs(path, std::ios::binary);
         if (!ifs) return fail(ErrorCode::InvalidArgument, "cannot open " + path.string());
@@ -34,6 +37,7 @@ namespace brdf::vision {
     }
 
     Status saveGrayImage(const std::filesystem::path& path, const GrayImage& image) {
+        detail::quietOpenCv();
         if (image.empty()) return fail(ErrorCode::InvalidArgument, "cannot save an empty image");
 
         const cv::Mat mat(image.height, image.width, CV_8UC1, const_cast<std::uint8_t*>(image.pixels.data()));

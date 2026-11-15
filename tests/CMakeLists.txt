@@ -16,6 +16,7 @@ add_executable(brdf_tests
     test_session.cpp
     test_commands.cpp
     test_calibration.cpp
+    test_calibrate.cpp
     test_headers.cpp
 )
 
