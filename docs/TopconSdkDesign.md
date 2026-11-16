@@ -233,8 +233,8 @@ tests/ test_topcon_imager.cpp  …… フェイクの ITopconApi で、手順・
 | 段階 | 内容 | 実機 |
 |---|---|---|
 | ② | `ITopconApi`、`TopconImager`、レシピ XML の書き出し(旧の `recipe.xml` と一致するテスト)、フェイクでのテスト — **済** | 不要 |
-| ③ | `Rc8Arm`(b-CAP。接続はセッションにつき 1 回。関節角は度の double。速度は ExtSpeed) | 不要(ビルドまで) |
-| ④ | 両方のエラー・タイムアウト・切断のテスト | 不要 |
+| ③ | `Rc8Arm`(b-CAP。接続はセッションにつき 1 回。関節角は度の double。速度は ExtSpeed)— **済**。[docs/Rc8ArmDesign.md](Rc8ArmDesign.md) | 不要(ビルドまで) |
+| ④ | 両方のエラー・タイムアウト・切断のテスト — アームは ③ で済み。TOPCON の SDK のエラーは、`Timeout` と `Communication` を分けて返すようにした | 不要 |
 | ⑤ | 実機のアームを低速で 1 回動かす(安全確認から) | **必要** |
 | ⑥ | 実機の分光放射計で `capture()`、旧の GUI の CSV と比較(§8 の 1〜3) | **必要** |
 | ⑦ | 通しの測定(白色板 → 試料 → `brdf analyze`) | **必要** |

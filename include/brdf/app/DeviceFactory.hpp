@@ -11,6 +11,7 @@
 #include "brdf/app/Devices.hpp"
 #include "brdf/core/Error.hpp"
 #include "brdf/domain/Recipe.hpp"
+#include "brdf/driver/rc8/Rc8Arm.hpp"
 #include "brdf/driver/topcon/TopconImager.hpp"
 #include "brdf/io/SetupConfig.hpp"
 
@@ -35,5 +36,15 @@ namespace brdf::app {
     /// NotImplemented を返す。
     Result<std::shared_ptr<driver::ISpectralImager>> makeTopconImager(const io::SetupConfig& setup,
                                                                       const std::filesystem::path& work_dir);
+
+    /// 実機のアームの左右。左 = 光源側(LightArm)、右 = 試料側(SampleArm)。
+    enum class RealArm { Left, Right };
+
+    /// setup.toml の [controllers](IP アドレスなど)と [arm.limits](可動域)から、実機のアーム 1 台の設定を作る。
+    driver::rc8::Rc8ArmConfig makeRc8Config(const io::SetupConfig& setup, RealArm arm);
+
+    /// 実機のアーム(DENSO RC8)を 1 台作る(まだ接続しない)。b-CAP の SDK なしでビルドした版(BRDF_WITH_BCAP=OFF)では
+    /// NotImplemented を返す。
+    Result<std::shared_ptr<driver::IRobotArm>> makeRc8Arm(const io::SetupConfig& setup, RealArm arm);
 
 } // namespace brdf::app

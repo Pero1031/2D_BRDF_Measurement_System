@@ -10,6 +10,9 @@
 #ifdef BRDF_WITH_TOPCON
 #include "brdf/driver/topcon/RealHsApi.hpp"
 #endif
+#ifdef BRDF_WITH_BCAP
+#include "brdf/driver/rc8/RealBcapApi.hpp"
+#endif
 
 #include "brdf/driver/topcon/TopconImager.hpp"
 #include "brdf/sim/BrdfModel.hpp"
@@ -35,7 +38,7 @@ namespace brdf::app {
     Result<Devices> makeDevices(const io::SetupConfig& setup, domain::MeasurementKind kind) {
         if (setup.mode == io::DeviceMode::Real) {
             return fail(ErrorCode::NotImplemented,
-                        "devices.mode = \"real\" is not supported yet (the robot arm driver is still to come); use \"sim\"");
+                        "devices.mode = \"real\" is not connected to the measurement run yet (the arm and spectroradiometer drivers exist but have not been tried on the real devices); use \"sim\"");
         }
 
         // カメラ: 位置は装置の配置から、向きは設定、無ければ既定
@@ -80,6 +83,31 @@ driver::topcon::TopconImagerConfig makeTopconConfig(const io::SetupConfig& setup
         c.spot_size = setup.spot_xml.spot_size;
         c.work_dir = work_dir;
         return c;
+    }
+
+    driver::rc8::Rc8ArmConfig makeRc8Config(const io::SetupConfig& setup, RealArm arm) {
+        const auto& ct = setup.controllers;
+        driver::rc8::Rc8ArmConfig c;
+        c.name = arm == RealArm::Left ? "LightArm" : "SampleArm";
+        c.host = arm == RealArm::Left ? ct.left_host : ct.right_host;
+        c.port = ct.port;
+        c.robot_name = ct.robot_name;
+        c.command_timeout_ms = ct.command_timeout_ms;
+        c.move_timeout_ms = ct.move_timeout_ms;
+        c.limits = setup.rig.joint_limits;
+        c.arrival_tolerance_deg = ct.arrival_tolerance_deg;
+        return c;
+    }
+
+    Result<std::shared_ptr<driver::IRobotArm>> makeRc8Arm(const io::SetupConfig& setup, RealArm arm) {
+#ifdef BRDF_WITH_BCAP
+        return std::make_shared<driver::rc8::Rc8Arm>(std::make_shared<driver::rc8::RealBcapApi>(), makeRc8Config(setup, arm));
+#else
+        (void)setup;
+        (void)arm;
+        return fail(ErrorCode::NotImplemented,
+                    "this build has no b-CAP support (configure with -DBRDF_WITH_BCAP=ON -DBCAP_SDK_DIR=<b-CAP SDK folder>)");
+#endif
     }
 
     Result<std::shared_ptr<driver::ISpectralImager>> makeTopconImager(const io::SetupConfig& setup,

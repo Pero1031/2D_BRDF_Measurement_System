@@ -26,6 +26,8 @@
 #include "brdf/driver/topcon/HsApi.hpp"
 #include "brdf/driver/topcon/TopconImager.hpp"
 #include "brdf/driver/topcon/RealHsApi.hpp"
+#include "brdf/driver/rc8/BcapApi.hpp"
+#include "brdf/driver/rc8/Rc8Arm.hpp"
 #include "brdf/io/RecipeFile.hpp"
 #include "brdf/app/SpotProjector.hpp"
 #include "brdf/app/Devices.hpp"

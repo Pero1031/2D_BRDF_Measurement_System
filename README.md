@@ -32,7 +32,7 @@ A detailed analysis of the previous system is in [docs/LegacySystemAnalysis.md](
 | P3 | Project folders, TOML configuration, measurement session, CLI | Done |
 | P4 | Calibration board, homography, spot XML | Done |
 | P5 | Analysis (white-plate normalization, BRDF) | Done |
-| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | In progress: the TOPCON driver is written and tested against a fake SDK (not yet tried on the device); the arm driver is next |
+| P6 | Real drivers (DENSO RC8 via b-CAP, TOPCON `hs_api`) | In progress: both drivers are written and tested against fakes (not yet tried on the devices); connecting them to `brdf run` and the first tests on the real hardware are next |
 | P7 | Documentation (usage, setup procedure, troubleshooting) | Not started |
 
 The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
@@ -56,11 +56,12 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A 3D animation of the arm motion (`brdf view`): one self-contained HTML file that opens in any browser, offline. Shows both arms, the light, the sample plate, the camera and its field of view, the spots and the light / viewing directions; play, step, jump to a pose, rotate the view; joint angles, the distance between the arms and the spot angles; arms turn red when they get too close, including *while moving between poses*
 - A simulated camera board: the simulator draws the calibration board through its camera model, so `calibrate` → `run` can be tried end to end without hardware
 - The `brdf` command line: `init`, `check`, `run`, `angles`, `import-poses`
+- A driver for the real robot arms (`driver::rc8::Rc8Arm`, DENSO RC8 over b-CAP), built on a thin interface to the b-CAP library (`IBcapApi`). One connection per session, joint angles sent as decimals (the previous system rounded them to integers), the motor is on only while a move runs, and the target is checked against the joint limits before anything is sent and against the encoders afterwards. A timeout or a lost connection halts the arm, turns the motor off and closes the connection instead of carrying on. It is tested with a fake b-CAP library that injects failures at every step; it has not been tried on the arms yet. Design notes: [docs/Rc8ArmDesign.md](docs/Rc8ArmDesign.md) (Japanese)
 - A driver for the real TOPCON spectroradiometer (`driver::topcon::TopconImager`), built on a thin interface to the SDK (`ITopconApi`). It writes the recipe and spot definition the SDK needs, measures, and returns the spectrum of every spot, so the manual step in TOPCON's own software is gone. It is tested with a fake SDK that records the call order and checks that nothing is leaked; it has not been tried on the device yet. Design notes: [docs/TopconSdkDesign.md](docs/TopconSdkDesign.md) (Japanese)
 
 ### What does not exist yet
 
-Control of the real robot arms (`mode = "real"` reports "not supported yet"), and anything that has been verified on the real devices.
+Running a measurement on the real devices (`mode = "real"` reports "not supported yet": both drivers exist, but they are not connected to `brdf run` yet), and anything that has been verified on the real devices.
 
 ## Hardware
 
@@ -161,6 +162,7 @@ ctest --preset debug
 
 - The first `cmake --preset default` takes a long time because vcpkg builds the dependencies (including OpenCV). Later runs take a few seconds.
 - You can also open this folder in Visual Studio with "Open a local folder"; it uses the same presets.
+- The driver for the real DENSO arms needs the b-CAP client SDK (MIT licensed; its `.lib` files are 32-bit only, so the build compiles the SDK's source for x64) and is off by default. To build it, add `-DBRDF_WITH_BCAP=ON -DBCAP_SDK_DIR=<SDK folder>` to `cmake --preset default`, where the folder contains `Include/C/bCAPClient/bcap_client.h` and `Src.Lib/*.c`. No DLL is needed at run time.
 - The driver for the real TOPCON spectroradiometer needs the TOPCON SDK and is off by default. To build it, add `-DBRDF_WITH_TOPCON=ON -DHS_SDK_DIR=<SDK folder>` to `cmake --preset default`, where the folder contains `include/hs_api.h` and `lib/hs_api.lib`. The program then needs the matching `hs_api.dll` (x64) next to `brdf.exe` or on `PATH`. Without the option, everything else builds and runs as before.
 
 Run the mock demo:

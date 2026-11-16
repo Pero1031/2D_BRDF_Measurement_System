@@ -63,6 +63,22 @@ namespace brdf::io {
             if (im.width() <= 0 || im.height() <= 0) {
                 return fail(ErrorCode::InvalidArgument, "setup: [imager] image_width and image_height must be positive");
             }
+            const auto& ct = c.controllers;
+            if (ct.left_host.empty() || ct.right_host.empty()) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] left_host and right_host must not be empty");
+            }
+            if (ct.port < 1 || ct.port > 65535) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] port must be 1..65535");
+            }
+            if (ct.robot_name.empty()) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] robot_name must not be empty");
+            }
+            if (ct.command_timeout_ms <= 0 || ct.move_timeout_ms <= 0) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] command_timeout_ms and move_timeout_ms must be positive");
+            }
+            if (!positive(ct.arrival_tolerance_deg)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] arrival_tolerance_deg must be positive");
+            }
             if (!positive(c.sim.camera.pixels_per_mm)) {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.camera] pixels_per_mm must be positive");
             }
@@ -239,6 +255,21 @@ namespace brdf::io {
             BRDF_TRY(s->finish());
         }
 
+        // --- [controllers] ---
+        {
+            auto s = top.child("controllers");
+            if (!s) return tl::unexpected(s.error());
+            auto& ct = c.controllers;
+            BRDF_TRY(s->string("left_host", ct.left_host));
+            BRDF_TRY(s->string("right_host", ct.right_host));
+            BRDF_TRY(s->integer("port", ct.port));
+            BRDF_TRY(s->string("robot_name", ct.robot_name));
+            BRDF_TRY(s->integer("command_timeout_ms", ct.command_timeout_ms));
+            BRDF_TRY(s->integer("move_timeout_ms", ct.move_timeout_ms));
+            BRDF_TRY(s->number("arrival_tolerance_deg", ct.arrival_tolerance_deg));
+            BRDF_TRY(s->finish());
+        }
+
         // --- [analysis] ---
         {
             auto s = top.child("analysis");
@@ -401,6 +432,16 @@ namespace brdf::io {
         if (c.imager.image_height) o << "image_height = " << *c.imager.image_height << "\n";
         else o << "# image_height = " << c.imager.height() << "\n";
         o << "\n";
+
+        const auto& ct = c.controllers;
+        o << "[controllers]   # 実機(mode = \"real\")の DENSO RC8 コントローラ(b-CAP)。sim のときは使わない\n"
+          << "left_host = " << quote(ct.left_host) << "   # 左アーム(光源側)の IP アドレス\n"
+          << "right_host = " << quote(ct.right_host) << "   # 右アーム(試料側)\n"
+          << "port = " << ct.port << "   # b-CAP のポート(RC8 の既定値)\n"
+          << "robot_name = " << quote(ct.robot_name) << "   # コントローラの中のロボット名\n"
+          << "command_timeout_ms = " << ct.command_timeout_ms << "   # 1 回の命令を待つ時間(モータ ON/OFF、速度設定、角度の取得)\n"
+          << "move_timeout_ms = " << ct.move_timeout_ms << "   # 移動(動作が終わるまで戻らない)を待つ時間。遅い速度で遠くへ動かすと長くかかる\n"
+          << "arrival_tolerance_deg = " << num(ct.arrival_tolerance_deg) << "   # 移動のあと、実際の関節角と目標の差がこれを超えたらエラー\n\n";
 
         o << "[analysis]   # brdf analyze の設定\n"
           << "white_reflectance = " << num(c.analysis.white_reflectance) << "   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)\n"

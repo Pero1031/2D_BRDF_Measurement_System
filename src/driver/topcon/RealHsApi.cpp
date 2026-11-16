@@ -40,6 +40,12 @@ namespace brdf::driver::topcon {
             case HS_ERROR_SATURATION:
             case HS_ERROR_OPTIMIZE_TOO_BRIGHT:
                 return ErrorCode::Saturated;
+            case HS_ERROR_PROCESS_TIMEOUT:
+                return ErrorCode::Timeout;
+            case HS_ERROR_NO_CONNECTABLE_DEVICE:
+            case HS_ERROR_CANNOT_FIND_CONNECTED_DEVICE:
+            case HS_ERROR_CANNOT_CONNECT_TO_DEVICE:
+                return ErrorCode::Communication;
             default:
                 return ErrorCode::DeviceError;
             }

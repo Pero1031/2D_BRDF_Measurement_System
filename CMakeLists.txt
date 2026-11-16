@@ -59,6 +59,7 @@ add_library(brdf_core
     src/io/SpotXml.cpp
     src/io/TopconRecipeXml.cpp
     src/driver/topcon/TopconImager.cpp
+    src/driver/rc8/Rc8Arm.cpp
     src/io/MeasurementsCsv.cpp
     src/analysis/RadianceFactor.cpp
     src/app/Analyze.cpp
@@ -103,6 +104,53 @@ if(BRDF_WITH_TOPCON)
     target_include_directories(brdf_core PRIVATE "${HS_SDK_DIR}/include")
     target_link_libraries(brdf_core PUBLIC "${HS_SDK_DIR}/lib/hs_api.lib")
     target_compile_definitions(brdf_core PUBLIC BRDF_WITH_TOPCON=1)
+endif()
+
+# ---------------------------------------------------------------------------
+# 実機のロボットアーム(DENSO RC8、b-CAP)。b-CAP の SDK がある PC だけで ON にする。
+#   cmake --preset default -DBRDF_WITH_BCAP=ON -DBCAP_SDK_DIR=<...>/CapLib/DENSO/RC8
+# BCAP_SDK_DIR は、Include/C/bCAPClient/bcap_client.h と Src.Lib/*.c を含むフォルダ(DENSO の b-CAP クライアント SDK、MIT ライセンス)。
+# 配布されている bCAPClient*.lib は 32 ビット版だけなので、SDK のソースを、このプロジェクトと同じ 64 ビットの静的ライブラリとして
+# ビルドする。実行時に必要な DLL はない。
+# ---------------------------------------------------------------------------
+option(BRDF_WITH_BCAP "Build the real DENSO RC8 (b-CAP) arm driver (needs the b-CAP client SDK)" OFF)
+set(BCAP_SDK_DIR "" CACHE PATH "Folder of the b-CAP client SDK (contains Include/C/bCAPClient/bcap_client.h and Src.Lib/*.c)")
+if(BRDF_WITH_BCAP)
+    if(NOT EXISTS "${BCAP_SDK_DIR}/Include/C/bCAPClient/bcap_client.h" OR NOT EXISTS "${BCAP_SDK_DIR}/Src.Lib/bCAPClient/bcap_client.c")
+        message(FATAL_ERROR "BRDF_WITH_BCAP=ON needs -DBCAP_SDK_DIR=<folder with Include/C/bCAPClient/bcap_client.h and Src.Lib/bCAPClient/bcap_client.c>")
+    endif()
+    enable_language(C)
+
+    # ヘッダは、ビルドフォルダにコピーして使う。SDK 同梱の古い stdint.h は、今の MSVC のものと衝突するので、コピーしない
+    # (ソースの #include "stdint.h" は、MSVC 標準のものに解決される)
+    set(BCAP_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/bcap_include)
+    file(GLOB BCAP_HEADERS "${BCAP_SDK_DIR}/Include/C/*.h")
+    list(FILTER BCAP_HEADERS EXCLUDE REGEX "/stdint[.]h$")
+    file(COPY ${BCAP_HEADERS} DESTINATION ${BCAP_INCLUDE_DIR})
+    file(COPY "${BCAP_SDK_DIR}/Include/C/bCAPClient/bcap_client.h" DESTINATION ${BCAP_INCLUDE_DIR}/bCAPClient)
+
+    add_library(bcap_client STATIC
+        "${BCAP_SDK_DIR}/Src.Lib/bcap_common.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_com.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_common.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_device.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_robotalk.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_socket.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_tcp.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_thread.c"
+        "${BCAP_SDK_DIR}/Src.Lib/dn_udp.c"
+        "${BCAP_SDK_DIR}/Src.Lib/bCAPClient/bcap_client.c")
+    target_include_directories(bcap_client PRIVATE ${BCAP_INCLUDE_DIR} ${BCAP_INCLUDE_DIR}/bCAPClient)
+    target_compile_definitions(bcap_client PRIVATE _USE_WIN_API WIN32 _WINDOWS _CRT_SECURE_NO_WARNINGS _WINSOCK_DEPRECATED_NO_WARNINGS)
+    # SDK のソースは 32 ビット時代のもので、ポインタを int に切り詰める警告が多数出る。切り詰めているのは
+    # 同じバッファ内の 2 つのポインタの差(数 KB)とソケット番号(小さい整数)だけで、実害はない。SDK のコードなので警告は消す。
+    target_compile_options(bcap_client PRIVATE /W0)
+    target_link_libraries(bcap_client PUBLIC ws2_32)
+
+    target_sources(brdf_core PRIVATE src/driver/rc8/RealBcapApi.cpp)
+    target_include_directories(brdf_core PRIVATE ${BCAP_INCLUDE_DIR} ${BCAP_INCLUDE_DIR}/bCAPClient)
+    target_link_libraries(brdf_core PUBLIC bcap_client)
+    target_compile_definitions(brdf_core PUBLIC BRDF_WITH_BCAP=1)
 endif()
 
 # toml++ のヘッダは src/io 内だけで使う(公開ヘッダには出さない)が、リンクは必要

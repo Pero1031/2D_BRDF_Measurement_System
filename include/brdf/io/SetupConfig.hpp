@@ -48,6 +48,19 @@ namespace brdf::io {
         int height() const { return image_height ? *image_height : sensorHeight() / binningFactor(); }
     };
 
+    /// 実機(mode = "real")のロボットアーム。2 台の DENSO RC8 コントローラに、b-CAP(TCP)でつなぐ。
+    /// 旧システムがヘッダに直書きしていた IP アドレスとポートの置き場所。
+    struct ControllerConfig {
+        std::string left_host = "192.168.0.2";    ///< 左アーム(光源側)のコントローラの IP アドレス
+        std::string right_host = "192.168.0.5";   ///< 右アーム(試料側)
+        int port = 5007;                          ///< b-CAP のポート(RC8 の既定値)
+        std::string robot_name = "Arm";           ///< コントローラの中のロボット名
+
+        int command_timeout_ms = 5000;            ///< 1 回の命令を待つ時間(モータ ON/OFF、速度設定、角度の取得)
+        int move_timeout_ms = 180000;             ///< 移動(動作が終わるまで戻らない)を待つ時間
+        Real arrival_tolerance_deg = 1.0;         ///< 移動のあと、実際の関節角と目標の差がこれを超えたらエラー
+    };
+
     /// シミュレーションのカメラ(物理的なカメラモデル)。画像の大きさは ImagerConfig で決まる。
     struct SimCameraConfig {
         /// 注視点での画像の解像度 [pixel/mm]。既定値は、旧システムの 1.81(SR-5000、1376 pixel)を
@@ -131,6 +144,7 @@ namespace brdf::io {
         DeviceMode mode = DeviceMode::Sim;
         geometry::RigSetup rig;
         ImagerConfig imager;
+        ControllerConfig controllers;
         CalibrationConfig calibration;
         SpotXmlConfig spot_xml;
         AnalysisConfig analysis;

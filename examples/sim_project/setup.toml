@@ -53,6 +53,15 @@ lens = "STANDARD"   # "WIDE" / "STANDARD" / "TELE" / "MACRO"
 # image_width = 2448   # 省略すると、機種とビニングから決まる
 # image_height = 2048
 
+[controllers]   # 実機(mode = "real")の DENSO RC8 コントローラ(b-CAP)。sim のときは使わない
+left_host = "192.168.0.2"   # 左アーム(光源側)の IP アドレス
+right_host = "192.168.0.5"   # 右アーム(試料側)
+port = 5007   # b-CAP のポート(RC8 の既定値)
+robot_name = "Arm"   # コントローラの中のロボット名
+command_timeout_ms = 5000   # 1 回の命令を待つ時間(モータ ON/OFF、速度設定、角度の取得)
+move_timeout_ms = 180000   # 移動(動作が終わるまで戻らない)を待つ時間。遅い速度で遠くへ動かすと長くかかる
+arrival_tolerance_deg = 1.0   # 移動のあと、実際の関節角と目標の差がこれを超えたらエラー
+
 [analysis]   # brdf analyze の設定
 white_reflectance = 0.99   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)
 min_wavelength_nm = 380.0   # 出力する波長の範囲。LED の出力が足りない 380 nm 付近と 770 nm 付近は信頼性が低い

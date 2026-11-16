@@ -20,6 +20,7 @@ add_executable(brdf_tests
     test_spot_xml.cpp
     test_topcon_recipe_xml.cpp
     test_topcon_imager.cpp
+    test_rc8_arm.cpp
     test_analysis.cpp
     test_view.cpp
     test_analyze_command.cpp

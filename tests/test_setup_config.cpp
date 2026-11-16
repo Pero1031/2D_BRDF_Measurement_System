@@ -38,6 +38,13 @@ namespace {
         CHECK(a.imager.calibration_dir == b.imager.calibration_dir);
         CHECK(a.imager.width() == b.imager.width());
         CHECK(a.imager.height() == b.imager.height());
+        CHECK(a.controllers.left_host == b.controllers.left_host);
+        CHECK(a.controllers.right_host == b.controllers.right_host);
+        CHECK(a.controllers.port == b.controllers.port);
+        CHECK(a.controllers.robot_name == b.controllers.robot_name);
+        CHECK(a.controllers.command_timeout_ms == b.controllers.command_timeout_ms);
+        CHECK(a.controllers.move_timeout_ms == b.controllers.move_timeout_ms);
+        CHECK_THAT(a.controllers.arrival_tolerance_deg, WithinAbs(b.controllers.arrival_tolerance_deg, 1e-12));
         CHECK_THAT(a.spot_xml.spot_size, WithinAbs(b.spot_xml.spot_size, 1e-12));
         CHECK_THAT(a.analysis.white_reflectance, WithinAbs(b.analysis.white_reflectance, 1e-12));
         CHECK_THAT(a.analysis.min_wavelength_nm, WithinAbs(b.analysis.min_wavelength_nm, 1e-12));
@@ -192,6 +199,16 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
         CHECK_THAT(errorOf("[imager]\nbinning = \"2\"\n"), ContainsSubstring("BINNING_TYPE1"));
         CHECK_THAT(errorOf("[imager]\nlens = \"zoom\"\n"), ContainsSubstring("STANDARD"));
         CHECK_THAT(errorOf("[spot_xml]\nbinning = \"BINNING_TYPE1\"\n"), ContainsSubstring("unknown key 'binning'"));
+    }
+    SECTION("controller settings") {
+        CHECK_THAT(errorOf("[controllers]\nleft_host = \"\"\n"), ContainsSubstring("left_host"));
+        CHECK_THAT(errorOf("[controllers]\nport = 0\n"), ContainsSubstring("port"));
+        CHECK_THAT(errorOf("[controllers]\nport = 70000\n"), ContainsSubstring("port"));
+        CHECK_THAT(errorOf("[controllers]\nrobot_name = \"\"\n"), ContainsSubstring("robot_name"));
+        CHECK_THAT(errorOf("[controllers]\ncommand_timeout_ms = 0\n"), ContainsSubstring("timeout"));
+        CHECK_THAT(errorOf("[controllers]\nmove_timeout_ms = -5\n"), ContainsSubstring("timeout"));
+        CHECK_THAT(errorOf("[controllers]\narrival_tolerance_deg = 0\n"), ContainsSubstring("arrival_tolerance_deg"));
+        CHECK_THAT(errorOf("[controllers]\nlefthost = \"1.2.3.4\"\n"), ContainsSubstring("unknown key 'lefthost'"));
     }
     SECTION("unknown sample model") {
         CHECK_THAT(errorOf("[sim.sample]\nmodel = \"mirror\"\n"), ContainsSubstring("lambert"));
