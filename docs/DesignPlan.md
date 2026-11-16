@@ -29,7 +29,7 @@
    ┌─────▼─────┐   ┌─────▼──────┐   ┌──────▼───────┐
    │  domain   │   │ algorithms │   │     io       │
    │ Recipe    │   │ kinematics │   │ TOML / CSV   │
-   │ Pose      │   │ optics     │   │ SR5000 XML   │
+   │ Pose      │   │ optics     │   │ TOPCON XML   │
    │ SpotSet   │   │ calibration│   │ Spectrum CSV │
    │ Result    │   │ planning   │   │              │
    └─────┬─────┘   └─────┬──────┘   └──────────────┘

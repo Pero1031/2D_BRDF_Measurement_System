@@ -1,6 +1,6 @@
 ﻿/*
 * @file src/io/SpotXml.cpp
-* @brief SR-5000 spot definition files (SpotDef XML).
+* @brief SR-5000 / SR-5100 spot definition files (SpotDef XML).
 */
 
 #include "brdf/io/SpotXml.hpp"

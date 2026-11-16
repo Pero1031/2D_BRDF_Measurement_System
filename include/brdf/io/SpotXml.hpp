@@ -1,6 +1,6 @@
 ﻿/*
 * @file include/brdf/io/SpotXml.hpp
-* @brief SR-5000 spot definition files (SpotDef XML): which image positions to extract spectra from.
+* @brief SR-5000 / SR-5100 spot definition files (SpotDef XML): which image positions to extract spectra from.
 */
 
 #pragma once
@@ -24,7 +24,7 @@ namespace brdf::io {
         std::string comment = "Random-Spot";
     };
 
-    /// TOPCON SR-5000 のソフトに読み込ませるスポット定義(SpotDef XML)を作る。
+    /// TOPCON SR-5000 / SR-5100 のソフトに読み込ませるスポット定義(SpotDef XML)を作る。
     /// 旧システムが生成していたファイルと同じ書式(UTF-8、CRLF、4 スペースのインデント、末尾に改行)。
     ///
     /// スポットの中心は整数のピクセルに丸める。旧システムは小数を切り捨てていた(平均 0.5 ピクセルのずれ)が、

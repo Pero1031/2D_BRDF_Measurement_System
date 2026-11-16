@@ -11,7 +11,7 @@
 *   brdf angles <dir>                        角度だけを出力する
 *   brdf analyze <dir> [--sample R] [--white R]  試料と白色板の測定から、放射輝度率と BRDF を計算する
 *   brdf view <dir> [--steps N]              ポーズの動きを、ブラウザで見られる 3D アニメーション(HTML)にする
-*   brdf spots <dir>                         SR-5000 用のスポット定義ファイル(XML)を、ポーズごとに出力する
+*   brdf spots <dir>                         SR-5000 / SR-5100 用のスポット定義ファイル(XML)を、ポーズごとに出力する
 *   brdf import-poses <csv> [--out F]        旧システムのポーズ CSV から recipe.toml を作る
 */
 
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
 
     // --- spots ---
     std::string spots_dir;
-    auto* spots = app.add_subcommand("spots", "Write SR-5000 spot definition files (XML), one per pose, from the calibration");
+    auto* spots = app.add_subcommand("spots", "Write spot definition files (XML for the TOPCON SR-5000 / SR-5100 software), one per pose, from the calibration");
     spots->add_option("dir", spots_dir, "project folder")->required();
     spots->callback([&] {
         auto r = brdf::app::exportSpots(spots_dir);

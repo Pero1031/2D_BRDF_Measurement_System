@@ -51,7 +51,7 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A measurement session that runs a recipe on the (simulated) devices and saves per-spot angles and spectra as CSV, together with a record of the settings used
 - A pre-flight check that finds joint-limit violations, arm collisions (including on the way to a pose) and spots whose light or camera is behind the surface, without moving anything
 - Import of the previous system's pose CSV (all 52 poses are accepted)
-- Calibration-board processing: circle-grid detection, a least-squares homography per pose, and SR-5000 spot definition files (XML). Checked against the previous system's real data: 13 images of 77 circles are detected and fitted, and the homographies agree with the saved ones to within 1 pixel at the paper corners; a previous spot XML is read and written back identically
+- Calibration-board processing: circle-grid detection, a least-squares homography per pose, and SR-5000 / SR-5100 spot definition files (XML). Checked against the previous system's real data: 13 images of 77 circles are detected and fitted, and the homographies agree with the saved ones to within 1 pixel at the paper corners; a previous spot XML is read and written back identically
 - Analysis: radiance factor = sample / white plate (the same poses), and the BRDF = factor × ρ / π. Optional correction for the different irradiance at the sample point and the white reference point, which removes the systematic error of the previous system (about ±11% in the simulator's default geometry). A round-trip test recovers the simulator's true glossy BRDF to 1e-4
 - A 3D animation of the arm motion (`brdf view`): one self-contained HTML file that opens in any browser, offline. Shows both arms, the light, the sample plate, the camera and its field of view, the spots and the light / viewing directions; play, step, jump to a pose, rotate the view; joint angles, the distance between the arms and the spot angles; arms turn red when they get too close, including *while moving between poses*
 - A simulated camera board: the simulator draws the calibration board through its camera model, so `calibrate` → `run` can be tried end to end without hardware
@@ -59,7 +59,7 @@ The full plan is in [docs/DesignPlan.md](docs/DesignPlan.md) (Japanese).
 - A driver for the real robot arms (`driver::rc8::Rc8Arm`, DENSO RC8 over b-CAP), built on a thin interface to the b-CAP library (`IBcapApi`). One connection per session, joint angles sent as decimals (the previous system rounded them to integers), the motor is on only while a move runs, and the target is checked against the joint limits before anything is sent and against the encoders afterwards. A timeout or a lost connection halts the arm, turns the motor off and closes the connection instead of carrying on. It is tested with a fake b-CAP library that injects failures at every step. Optionally (`abortable_moves`, off by default until it has been tried on the arms) a move runs asynchronously and Ctrl+C halts the arm in the middle of it. It has not been tried on the arms yet. Design notes: [docs/Rc8ArmDesign.md](docs/Rc8ArmDesign.md) (Japanese)
 - Guards for the real arms (all in `brdf run`, `brdf calibrate` and `brdf arm`): a speed limit (`max_speed`, 5% by default), a confirmation screen that shows the effective speed and the range of motion and needs a typed `OK` (`--yes` does not skip it), a check of the path from the arms' *actual* position to the first pose, collision checks along the path between poses (not only at the poses), a warning for poses outside the range the previous system used, and both arms are halted before disconnecting when anything fails. `brdf arm status` shows the joint angles; `brdf arm move` moves one arm at a time (to angles, to the standard pose, or by jogging one joint)
 - A written safety procedure for the first moves of the real arms, with the joint ranges found in the previous system's pose files: [docs/SafetyProcedure.md](docs/SafetyProcedure.md) (Japanese)
-- A driver for the real TOPCON spectroradiometer (`driver::topcon::TopconImager`), built on a thin interface to the SDK (`ITopconApi`). It writes the recipe and spot definition the SDK needs, measures, and returns the spectrum of every spot, so the manual step in TOPCON's own software is gone. It is tested with a fake SDK that records the call order and checks that nothing is leaked; it has not been tried on the device yet. Design notes: [docs/TopconSdkDesign.md](docs/TopconSdkDesign.md) (Japanese)
+- A driver for the real TOPCON spectroradiometer (SR-5100, or SR-5000; `driver::topcon::TopconImager`), built on a thin interface to the SDK (`ITopconApi`). It writes the recipe and spot definition the SDK needs, measures, and returns the spectrum of every spot, so the manual step in TOPCON's own software is gone. It is tested with a fake SDK that records the call order and checks that nothing is leaked; it has not been tried on the device yet. Design notes: [docs/TopconSdkDesign.md](docs/TopconSdkDesign.md) (Japanese)
 
 ### What does not exist yet
 
@@ -68,7 +68,7 @@ Anything that has been verified on the real devices. `mode = "real"` runs only i
 ## Hardware
 
 - Robot arms: 2 × DENSO **VP-6242** (6-axis) with RC8 controllers. The link dimensions in `geometry::ArmLinks` match the manufacturer's outline drawing, and the joint limits in `geometry::JointLimits` are the factory software-limit values from the VP robot manual.
-- Spectroradiometer: TOPCON SR-5000H.
+- Spectroradiometer: TOPCON **SR-5100** (2448 × 2048 pixels), the newest instrument of the lab. The earlier data of the previous system was measured with the SR-5000H (1376 × 1024 pixels). Both use the same SDK (`hs_api`), and `[imager] device = "SR5100"` (default) or `"SR5000"` in `setup.toml` selects the model, the image size and the binning. The driver refuses to run if the connected device is a different model from the one in `setup.toml`.
 - The arm radius used by the clearance check (`RigSetup::arm_radius`) is an estimate from the outline drawing, and it does not include the sample plate.
 
 ## Quick start
@@ -87,7 +87,7 @@ build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; typ
 | `brdf angles <dir>` | write only the angles of every pose and spot |
 | `brdf analyze <dir> [--sample R] [--white R] [--irradiance-correction]` | compute the radiance factor and the BRDF from a sample run and a white-plate run |
 | `brdf view <dir> [--steps N]` | export the poses as a 3D animation (one HTML file) under `result/<date>_<time>_view/` |
-| `brdf spots <dir>` | write SR-5000 spot definition files (XML), one per pose, from the calibration |
+| `brdf spots <dir>` | write spot definition files (XML for the TOPCON SR-5000 / SR-5100 software), one per pose, from the calibration |
 | `brdf import-poses <csv> [--out recipe.toml]` | build a recipe from the previous system's pose CSV |
 
 A project folder holds everything about one measurement, and no absolute path is written in it:
@@ -141,7 +141,7 @@ By default the simulator projects the spots with its own camera model (`projecto
 build/Debug/brdf.exe calibrate examples/sim_project   # mount the board where the sample goes; one homography per pose
 # set  projector = "board"  in setup.toml, then
 build/Debug/brdf.exe run   examples/sim_project
-build/Debug/brdf.exe spots examples/sim_project       # spot definition files for the SR-5000 software
+build/Debug/brdf.exe spots examples/sim_project       # spot definition files for the TOPCON software (SR-5100)
 ```
 
 How the board is mounted matters: because the circles form a symmetric grid, the image alone cannot tell which way round the board is.

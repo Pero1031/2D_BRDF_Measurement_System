@@ -58,7 +58,7 @@ namespace brdf::driver {
         Real integration_time_ms = 100.0;      ///< 積分時間。0 のときは装置の既定値(実機)
     };
 
-    /// 2D 分光放射計のインターフェース。実機(TOPCON SR-5000H)とモックが実装する。
+    /// 2D 分光放射計のインターフェース。実機(TOPCON SR-5100 / SR-5000)とモックが実装する。
     class ISpectralImager {
     public:
         virtual ~ISpectralImager() = default;
