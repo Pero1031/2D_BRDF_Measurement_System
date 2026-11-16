@@ -112,7 +112,7 @@ TEST_CASE("calibration CSV errors point to the line", "[calibrate]") {
     CHECK_THAT(io::loadCalibration("no/such/file.csv").error().message, ContainsSubstring("brdf calibrate"));
 }
 
-TEST_CASE("the simulated imager draws the calibration board where the camera model says", "[calibrate][sim]") {
+TEST_CASE("the simulated imager draws the calibration board where the camera model says", "[calibrate][sim][slow]") {
     TempDir tmp("board_image");
     const fs::path dir = makeSmallProject(tmp.path);
     const auto project = loadProject(dir);
@@ -155,7 +155,7 @@ TEST_CASE("the simulated imager draws the calibration board where the camera mod
     }
 }
 
-TEST_CASE("calibrate finds an accurate homography for every pose", "[calibrate]") {
+TEST_CASE("calibrate finds an accurate homography for every pose", "[calibrate][slow]") {
     TempDir tmp("calibrate");
     const fs::path dir = makeSmallProject(tmp.path);
 
@@ -180,7 +180,7 @@ TEST_CASE("calibrate finds an accurate homography for every pose", "[calibrate]"
     CHECK(loaded->size() == 3);
 }
 
-TEST_CASE("the homography agrees with the true camera model for points on the sample", "[calibrate]") {
+TEST_CASE("the homography agrees with the true camera model for points on the sample", "[calibrate][slow]") {
     // シミュレータのカメラモデルは「真の答え」。校正(画像からの検出 + ホモグラフィ)がそれに近いことの確認。
     TempDir tmp("agree");
     const fs::path dir = makeSmallProject(tmp.path);
@@ -225,7 +225,7 @@ TEST_CASE("the homography agrees with the true camera model for points on the sa
     CHECK(worst < 1.0);
 }
 
-TEST_CASE("run with the board projector gives the same measurement as the camera model", "[calibrate]") {
+TEST_CASE("run with the board projector gives the same measurement as the camera model", "[calibrate][slow]") {
     TempDir tmp("run_board");
     const fs::path dir = makeSmallProject(tmp.path);
 
@@ -272,7 +272,7 @@ TEST_CASE("run with the board projector gives the same measurement as the camera
     CHECK(worst_spectrum < 0.02);   // 2% 以内
 }
 
-TEST_CASE("board mode without a calibration refuses to run and tells what to do", "[calibrate]") {
+TEST_CASE("board mode without a calibration refuses to run and tells what to do", "[calibrate][slow]") {
     TempDir tmp("nocalib");
     const fs::path dir = makeSmallProject(tmp.path);
     replaceInFile(dir / "setup.toml", "projector = \"camera-model\"", "projector = \"board\"");
@@ -305,7 +305,7 @@ TEST_CASE("board mode without a calibration refuses to run and tells what to do"
     }
 }
 
-TEST_CASE("calibrate reports the poses where the board cannot be used", "[calibrate]") {
+TEST_CASE("calibrate reports the poses where the board cannot be used", "[calibrate][slow]") {
     TempDir tmp("calib_fail");
     const fs::path dir = makeSmallProject(tmp.path);
 

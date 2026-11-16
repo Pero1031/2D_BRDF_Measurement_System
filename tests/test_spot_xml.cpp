@@ -132,7 +132,7 @@ TEST_CASE("spot XML: the datetime attribute", "[spotxml]") {
     CHECK(spotXmlDatetime("2026111_0646470") == "2026111_0646470");
 }
 
-TEST_CASE("brdf spots writes one definition file per pose from the calibration", "[spotxml][commands]") {
+TEST_CASE("brdf spots writes one definition file per pose from the calibration", "[spotxml][commands][slow]") {
     TempDir tmp("spots");
     const fs::path dir = tmp.path / "p";
     REQUIRE(app::initProject(dir).has_value());

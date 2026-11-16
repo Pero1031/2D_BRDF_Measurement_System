@@ -273,7 +273,7 @@ TEST_CASE("legacy 2020 data: homographies fitted from the detected circles match
     }
 }
 
-TEST_CASE("circle grid detection on rendered boards", "[calibration][vision]") {
+TEST_CASE("circle grid detection on rendered boards", "[calibration][vision][slow]") {
     const BoardLayout layout = BoardLayout::legacy2023();
     constexpr int W = 1376, H = 1024;
 

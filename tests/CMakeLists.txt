@@ -35,4 +35,6 @@ target_compile_definitions(brdf_tests PRIVATE
     BRDF_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
 include(Catch)
-catch_discover_tests(brdf_tests)
+# [slow] のテスト(校正ボードの描画と検出。Debug で約 150 秒)は、ctest のラベル "slow" になる。
+# 普段は ctest -LE slow で外し、push の前などに全件を実行する(toolsbuild.cmd debug test-all)
+catch_discover_tests(brdf_tests ADD_TAGS_AS_LABELS)
