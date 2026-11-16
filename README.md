@@ -163,6 +163,7 @@ ctest --preset debug
 ```
 
 - The first `cmake --preset default` takes a long time because vcpkg builds the dependencies (including OpenCV). Later runs take a few seconds.
+- For faster rebuilds, use Ninja: `toolsuild.cmd [debug|release] [test]` sets up the Visual C++ environment, configures `build-ninja/` on first use, builds, and runs the tests with `test` (the `ninja` presets in `CMakePresets.json`; Ninja comes with Visual Studio). A full build from scratch took about 4 minutes and a rebuild after touching a widely included header about 1.5 minutes. The Visual Studio build in `build/` is unaffected.
 - You can also open this folder in Visual Studio with "Open a local folder"; it uses the same presets.
 - The driver for the real DENSO arms needs the b-CAP client SDK (MIT licensed; its `.lib` files are 32-bit only, so the build compiles the SDK's source for x64) and is off by default. To build it, add `-DBRDF_WITH_BCAP=ON -DBCAP_SDK_DIR=<SDK folder>` to `cmake --preset default`, where the folder contains `Include/C/bCAPClient/bcap_client.h` and `Src.Lib/*.c`. No DLL is needed at run time.
 - The driver for the real TOPCON spectroradiometer needs the TOPCON SDK and is off by default. To build it, add `-DBRDF_WITH_TOPCON=ON -DHS_SDK_DIR=<SDK folder>` to `cmake --preset default`, where the folder contains `include/hs_api.h` and `lib/hs_api.lib`. The program then needs the matching `hs_api.dll` (x64) next to `brdf.exe` or on `PATH`. Without the option, everything else builds and runs as before.
