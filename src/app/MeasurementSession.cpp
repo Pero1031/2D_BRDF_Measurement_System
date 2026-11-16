@@ -8,6 +8,7 @@
 #include <map>
 #include <utility>
 
+#include "brdf/app/RealRun.hpp"
 namespace brdf::app {
 
     namespace {
@@ -25,8 +26,9 @@ namespace brdf::app {
 
     } // namespace
 
-    MeasurementSession::MeasurementSession(geometry::RigGeometry geometry, Devices devices, domain::Recipe recipe)
-        : geometry_(std::move(geometry)), devices_(std::move(devices)), recipe_(std::move(recipe)) {}
+    MeasurementSession::MeasurementSession(geometry::RigGeometry geometry, Devices devices, domain::Recipe recipe,
+                                           SessionOptions options)
+        : geometry_(std::move(geometry)), devices_(std::move(devices)), recipe_(std::move(recipe)), options_(std::move(options)) {}
 
     Status MeasurementSession::connectAll() {
         if (!devices_.left_arm || !devices_.right_arm || !devices_.imager || !devices_.projector) {
@@ -51,11 +53,34 @@ namespace brdf::app {
         }
         DisconnectGuard guard{[this] { disconnectAll(); }};
 
+        // 実機: アームの実際の位置から、最初の姿勢までの道のりが安全かを、動かす前に確かめる
+        if (options_.check_start_path && !recipe_.poses.empty()) {
+            if (auto s = checkStartPosition(geometry_, *devices_.left_arm, *devices_.right_arm, recipe_.poses.front(),
+                                            options_.preflight);
+                !s) {
+                return tl::unexpected(s.error());
+            }
+        }
+
+        auto result = runPoses(progress);
+        if (!result) {
+            // 失敗したときは、動作中だったかもしれないので、切断する前に両方のアームを止める
+            devices_.left_arm->stop();
+            devices_.right_arm->stop();
+        }
+        return result;
+    }
+
+    Result<SessionResult> MeasurementSession::runPoses(const ProgressFn& progress) {
         SessionResult result;
         const int total = static_cast<int>(recipe_.poses.size());
 
         for (int i = 0; i < total; ++i) {
             const domain::PoseStep& pose = recipe_.poses[i];
+            if (cancelled()) {
+                return fail(ErrorCode::Cancelled, "cancelled before pose \"" + pose.id + "\" (" + std::to_string(i) + " of " +
+                                                      std::to_string(total) + " poses done)");
+            }
             if (progress) progress(i, total, pose);
 
             // 1. 移動(左アーム → 右アームの順。事前検査も同じ順で途中の干渉を確認している)

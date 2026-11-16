@@ -9,13 +9,16 @@
 #include <cctype>
 #include <fstream>
 #include <functional>
+#include <iostream>
 
 #include <spdlog/spdlog.h>
 
 #include "brdf/app/AngleTable.hpp"
 #include "brdf/app/Commands.hpp"
 #include "brdf/app/DeviceFactory.hpp"
+#include "brdf/app/Interrupt.hpp"
 #include "brdf/app/Preflight.hpp"
+#include "brdf/app/RealRun.hpp"
 #include "brdf/app/ProjectLayout.hpp"
 #include "brdf/vision/CircleGridDetector.hpp"
 #include "brdf/vision/HomographyFit.hpp"
@@ -35,6 +38,10 @@ namespace brdf::app {
     } // namespace
 
     Result<std::vector<io::PoseCalibration>> calibrateProject(const fs::path& dir) {
+        return calibrateProject(dir, std::cin);
+    }
+
+    Result<std::vector<io::PoseCalibration>> calibrateProject(const fs::path& dir, std::istream& in) {
         const ProjectLayout layout(dir);
         auto project = loadProject(dir);
         if (!project) return tl::unexpected(project.error());
@@ -43,18 +50,27 @@ namespace brdf::app {
 
         // 実機を動かす前の検査(可動域・干渉)
         const geometry::RigGeometry geometry(setup.rig);
-        const PreflightReport report = preflight(geometry, recipe);
+        const PreflightOptions preflight_options = preflightOptionsFor(setup);
+        const PreflightReport report = preflight(geometry, recipe, preflight_options);
         logReport(report);
         if (!report.ok()) {
             return fail(ErrorCode::InvalidArgument,
                         "pre-flight check found " + std::to_string(report.errorCount()) + " error(s); nothing was moved");
         }
 
-        auto devices = makeDevices(setup);
+        const bool real = setup.mode == io::DeviceMode::Real;
+        const auto cancel = std::make_shared<CancelToken>();
+        std::error_code work_ec;
+        if (real) fs::create_directories(layout.workDir(), work_ec);
+        if (work_ec) return fail(ErrorCode::DeviceError, "cannot create " + layout.workDir().string());
+        auto devices = makeDevices(setup, domain::MeasurementKind::Sample, real ? layout.workDir() : fs::path{}, cancel);
         if (!devices) return tl::unexpected(devices.error());
         if (!devices->left_arm || !devices->right_arm || !devices->imager) {
             return fail(ErrorCode::InvalidArgument, "calibration: the device set is incomplete");
         }
+
+        // 実機のアームを動かす前の確認(装置、速度、動かす範囲、中止の方法)
+        if (auto s = confirmRealMotion(setup, recipe, in); !s) return tl::unexpected(s.error());
 
         if (auto s = devices->left_arm->connect(); !s)  return fail(s.error().code, "left arm: " + s.error().message);
         if (auto s = devices->right_arm->connect(); !s) return fail(s.error().code, "right arm: " + s.error().message);
@@ -64,6 +80,15 @@ namespace brdf::app {
             devices->right_arm->disconnect();
             devices->left_arm->disconnect();
         }};
+
+        // 実機: アームの実際の位置から、最初の姿勢までの道のりが安全かを、動かす前に確かめる
+        if (real && !recipe.poses.empty()) {
+            if (auto s = checkStartPosition(geometry, *devices->left_arm, *devices->right_arm, recipe.poses.front(), preflight_options);
+                !s) {
+                return tl::unexpected(s.error());
+            }
+        }
+        ScopedInterruptHandler interrupt(cancel);   // Ctrl+C で、次の姿勢へ進まずに止まる
 
         std::error_code ec;
         fs::create_directories(layout.calibrationImagesDir(), ec);
@@ -78,6 +103,10 @@ namespace brdf::app {
 
         for (int i = 0; i < total; ++i) {
             const domain::PoseStep& pose = recipe.poses[static_cast<std::size_t>(i)];
+            if (cancel->requested()) {
+                failures.push_back("cancelled before pose \"" + pose.id + "\"");
+                break;
+            }
             spdlog::info("calibrating pose {}/{} (\"{}\")", i + 1, total, pose.id);
 
             auto fail_pose = [&](const std::string& why) {
@@ -85,13 +114,18 @@ namespace brdf::app {
                 failures.push_back("\"" + pose.id + "\" (" + why + ")");
             };
 
+            // アームの移動の失敗は、検出の失敗とは違う(アームがどこにいるか分からなくなる)。次の姿勢へ進まずに、止める
             if (auto s = devices->left_arm->moveJ(pose.left, recipe.capture.arm_speed); !s) {
                 fail_pose("moving the left arm: " + s.error().message);
-                continue;
+                devices->left_arm->stop();
+                devices->right_arm->stop();
+                break;
             }
             if (auto s = devices->right_arm->moveJ(pose.right, recipe.capture.arm_speed); !s) {
                 fail_pose("moving the right arm: " + s.error().message);
-                continue;
+                devices->left_arm->stop();
+                devices->right_arm->stop();
+                break;
             }
 
             driver::ImageRequest request;

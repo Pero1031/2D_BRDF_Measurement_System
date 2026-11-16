@@ -40,7 +40,11 @@ TEST_CASE("makeDevices: real mode is not supported yet", "[session]") {
     setup.mode = io::DeviceMode::Real;
     const auto d = makeDevices(setup);
     REQUIRE_FALSE(d.has_value());
+#if defined(BRDF_WITH_BCAP) && defined(BRDF_WITH_TOPCON)
+    CHECK(d.error().code == ErrorCode::InvalidArgument);   // 作業用のフォルダがない(tests/test_real_run.cpp に、詳しいテスト)
+#else
     CHECK(d.error().code == ErrorCode::NotImplemented);
+#endif
 }
 
 TEST_CASE("a simulated session measures every pose and every spot", "[session]") {

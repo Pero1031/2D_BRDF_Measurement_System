@@ -79,6 +79,9 @@ namespace brdf::io {
             if (!positive(ct.arrival_tolerance_deg)) {
                 return fail(ErrorCode::InvalidArgument, "setup: [controllers] arrival_tolerance_deg must be positive");
             }
+            if (!(ct.max_speed > 0.0 && ct.max_speed <= 1.0)) {
+                return fail(ErrorCode::InvalidArgument, "setup: [controllers] max_speed must be greater than 0 and at most 1");
+            }
             if (!positive(c.sim.camera.pixels_per_mm)) {
                 return fail(ErrorCode::InvalidArgument, "setup: [sim.camera] pixels_per_mm must be positive");
             }
@@ -267,6 +270,8 @@ namespace brdf::io {
             BRDF_TRY(s->integer("command_timeout_ms", ct.command_timeout_ms));
             BRDF_TRY(s->integer("move_timeout_ms", ct.move_timeout_ms));
             BRDF_TRY(s->number("arrival_tolerance_deg", ct.arrival_tolerance_deg));
+            BRDF_TRY(s->number("max_speed", ct.max_speed));
+            BRDF_TRY(s->boolean("abortable_moves", ct.abortable_moves));
             BRDF_TRY(s->finish());
         }
 
@@ -441,7 +446,9 @@ namespace brdf::io {
           << "robot_name = " << quote(ct.robot_name) << "   # コントローラの中のロボット名\n"
           << "command_timeout_ms = " << ct.command_timeout_ms << "   # 1 回の命令を待つ時間(モータ ON/OFF、速度設定、角度の取得)\n"
           << "move_timeout_ms = " << ct.move_timeout_ms << "   # 移動(動作が終わるまで戻らない)を待つ時間。遅い速度で遠くへ動かすと長くかかる\n"
-          << "arrival_tolerance_deg = " << num(ct.arrival_tolerance_deg) << "   # 移動のあと、実際の関節角と目標の差がこれを超えたらエラー\n\n";
+          << "arrival_tolerance_deg = " << num(ct.arrival_tolerance_deg) << "   # 移動のあと、実際の関節角と目標の差がこれを超えたらエラー\n"
+          << "max_speed = " << num(ct.max_speed) << "   # 速度の上限(割合)。recipe.toml の arm_speed がこれより大きくても、この速度で動かす。最初は 0.05(5%)\n"
+          << "abortable_moves = " << (ct.abortable_moves ? "true" : "false") << "   # true: 移動を非同期で始めて、動作中でも Ctrl+C で止められるようにする(実機で確かめてから)\n\n";
 
         o << "[analysis]   # brdf analyze の設定\n"
           << "white_reflectance = " << num(c.analysis.white_reflectance) << "   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)\n"

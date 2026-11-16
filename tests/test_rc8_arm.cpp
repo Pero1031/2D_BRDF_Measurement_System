@@ -13,6 +13,9 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "brdf/app/DeviceFactory.hpp"
+#include "brdf/app/Interrupt.hpp"
+#include <csignal>
+#include <functional>
 #include "brdf/driver/rc8/Rc8Arm.hpp"
 #ifdef BRDF_WITH_BCAP
 #include "brdf/driver/rc8/RealBcapApi.hpp"
@@ -37,6 +40,13 @@ namespace {
         bool ignore_moves = false;                    ///< 移動の命令が無視される(動かないのに成功を返す)
         double arrival_error_deg = 0.0;               ///< 移動のあと、J1 がこれだけ目標からずれる
         Degrees6 start{0.0, 0.0, 90.0, 0.0, 45.0, 0.0};
+
+        // --- 非同期の移動(moveJointAsync)---
+        int async_polls = 4;                          ///< 非同期の移動が、この回数目の currentJoint で目標に着く
+        bool async_never_starts = false;              ///< 命令を受け付けるが、動かない
+        double async_stop_fraction = 1.0;             ///< 目標までのこの割合で止まる(1 未満なら、途中で止まる)
+        std::function<void()> on_current_joint;       ///< currentJoint が呼ばれるたびに呼ぶ(途中で中止を要求する、など)
+        std::vector<Degrees6> async_moves;
 
         // --- 記録 ---
         std::vector<std::string> calls;
@@ -148,12 +158,31 @@ namespace {
             }
             return {};
         }
+        Status moveJointAsync(const BcapRobot&, const Degrees6& target) override {
+            if (auto e = enter("moveJointAsync")) return tl::unexpected(*e);
+            async_moves.push_back(target);
+            if (!async_never_starts) {
+                pending_ = true;
+                progress_ = 0;
+                from_ = start;
+                to_ = target;
+            }
+            return {};
+        }
         Result<Degrees6> currentJoint(const BcapRobot&) override {
             if (auto e = enter("currentJoint")) return tl::unexpected(*e);
+            if (on_current_joint) on_current_joint();
+            if (pending_) {
+                ++progress_;
+                const double f = std::min(1.0, static_cast<double>(progress_) / async_polls) * async_stop_fraction;
+                for (std::size_t i = 0; i < 6; ++i) start[i] = from_[i] + (to_[i] - from_[i]) * f;
+                if (progress_ >= async_polls) pending_ = false;
+            }
             return start;
         }
         Status halt(const BcapRobot&) override {
             if (auto e = enter("halt")) return tl::unexpected(*e);
+            pending_ = false;   // 止めると、そこで止まる
             return {};
         }
 
@@ -169,6 +198,9 @@ namespace {
 
     private:
         bool dead_ = false;
+        bool pending_ = false;
+        int progress_ = 0;
+        Degrees6 from_{}, to_{};
 
         std::optional<Error> enter(const std::string& name) {
             calls.push_back(name);
@@ -184,13 +216,18 @@ namespace {
 
     struct Fixture {
         std::shared_ptr<FakeBcap> api = std::make_shared<FakeBcap>();
+        std::shared_ptr<CancelToken> cancel = std::make_shared<CancelToken>();
         Rc8ArmConfig config;
         std::unique_ptr<Rc8Arm> arm;
+        int slept_ms = 0;   ///< 待った時間の合計(実際には待たない)
 
-        Fixture() { config.name = "SampleArm"; }
+        Fixture() {
+            config.name = "SampleArm";
+            config.sleep_ms = [this](int ms) { slept_ms += ms; };
+        }
 
         Rc8Arm& make() {
-            arm = std::make_unique<Rc8Arm>(api, config);
+            arm = std::make_unique<Rc8Arm>(api, config, cancel);
             return *arm;
         }
         Rc8Arm& connected() {
@@ -706,6 +743,8 @@ TEST_CASE("makeRc8Config takes the controller settings from setup.toml", "[rc8][
     setup.controllers.command_timeout_ms = 1234;
     setup.controllers.move_timeout_ms = 56789;
     setup.controllers.arrival_tolerance_deg = 0.25;
+    setup.controllers.max_speed = 0.1;
+    setup.controllers.abortable_moves = true;
     setup.rig.joint_limits.upper(0) = toRadians(100.0);
 
     const auto left = app::makeRc8Config(setup, app::RealArm::Left);
@@ -723,6 +762,8 @@ TEST_CASE("makeRc8Config takes the controller settings from setup.toml", "[rc8][
         CHECK_THAT(c->arrival_tolerance_deg, WithinAbs(0.25, 1e-12));
         CHECK_THAT(c->limits.upper(0), WithinAbs(toRadians(100.0), 1e-12));   // [arm.limits] が、送る前の可動域チェックに使われる
         CHECK(c->retry == 0);
+        CHECK_THAT(c->max_speed, WithinAbs(0.1, 1e-12));
+        CHECK(c->abortable_moves);
     }
 }
 
@@ -732,6 +773,9 @@ TEST_CASE("the default controller addresses are the ones the legacy system used"
     CHECK(app::makeRc8Config(setup, app::RealArm::Right).host == "192.168.0.5");
     CHECK(app::makeRc8Config(setup, app::RealArm::Left).port == 5007);
     CHECK(app::makeRc8Config(setup, app::RealArm::Left).robot_name == "Arm");
+    // 安全側の既定値: 速度の上限は 5%、中止できる移動は(実機で確かめるまで)使わない
+    CHECK_THAT(app::makeRc8Config(setup, app::RealArm::Left).max_speed, WithinAbs(0.05, 1e-12));
+    CHECK_FALSE(app::makeRc8Config(setup, app::RealArm::Left).abortable_moves);
 }
 
 #ifndef BRDF_WITH_BCAP
@@ -792,3 +836,186 @@ TEST_CASE("Rc8Arm with the real library: connecting to nothing leaves nothing op
     arm.disconnect();
 }
 #endif
+
+// ---------------------------------------------------------------------------
+// 速度の上限
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Rc8: the speed limit caps the requested speed", "[rc8][safety]") {
+    Fixture f;
+    f.config.max_speed = 0.05;
+    Rc8Arm& arm = f.connected();
+
+    REQUIRE(arm.moveJ(pose(), 0.5).has_value());      // レシピの速度が速すぎても
+    REQUIRE(arm.moveJ(pose(), 1.0).has_value());
+    REQUIRE(arm.moveJ(pose(), 0.03).has_value());     // 上限より遅い指定は、そのまま
+    REQUIRE(f.api->speeds.size() == 3);
+    CHECK_THAT(f.api->speeds[0], WithinAbs(5.0, 1e-9));   // 5% で動かす
+    CHECK_THAT(f.api->speeds[1], WithinAbs(5.0, 1e-9));
+    CHECK_THAT(f.api->speeds[2], WithinAbs(3.0, 1e-9));
+}
+
+TEST_CASE("Rc8: an invalid speed limit is refused when connecting", "[rc8][safety]") {
+    for (const double bad : {0.0, -0.1, 1.5}) {
+        Fixture f;
+        f.config.max_speed = bad;
+        const Status s = f.make().connect();
+        REQUIRE_FALSE(s.has_value());
+        CHECK(s.error().code == ErrorCode::InvalidArgument);
+        CHECK(f.api->calls.empty());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 中止
+// ---------------------------------------------------------------------------
+
+TEST_CASE("Rc8: a cancel request stops the next move before anything is sent", "[rc8][cancel]") {
+    Fixture f;
+    Rc8Arm& arm = f.connected();
+    f.cancel->request();
+
+    const Status s = arm.moveJ(pose(), 0.5);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::Cancelled);
+    CHECK(f.api->calls.empty());
+    CHECK(arm.isConnected());
+}
+
+TEST_CASE("Rc8: an abortable move waits by reading the joint angles until the arm settles", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    Rc8Arm& arm = f.connected();
+
+    REQUIRE(arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05).has_value());
+
+    // 非同期で始める。動作の完了を待つ呼び出し(moveJoint)も、待ち時間の切り替えも使わない
+    CHECK(f.api->count("moveJointAsync") == 1);
+    CHECK(f.api->count("moveJoint") == 0);
+    CHECK(f.api->count("setTimeout") == 0);
+    CHECK(f.api->count("currentJoint") >= 4);
+    CHECK(f.slept_ms == 100 * f.api->count("currentJoint"));   // 読む前に、間隔だけ待つ
+    CHECK(f.api->motor_log == std::vector<bool>{true, false});
+    CHECK_THAT(f.api->start[0], WithinAbs(65.0, 1e-9));
+    CHECK(arm.isConnected());
+    // 動作の前後は、通常の移動と同じ(速度の設定 → モータ ON、最後にモータ OFF)
+    CHECK(f.api->sequence().starts_with("setExtSpeed,setMotor,moveJointAsync,currentJoint"));
+    CHECK(f.api->sequence().ends_with("currentJoint,setMotor"));
+}
+
+TEST_CASE("Rc8: a cancel request during a move halts the arm and turns the motor off", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.api->async_polls = 20;   // ゆっくり動く
+    Rc8Arm& arm = f.connected();
+    int reads = 0;
+    f.api->on_current_joint = [&] { if (++reads == 3) f.cancel->request(); };   // 3 回目に読んだあとで、中止を要求
+
+    const Status s = arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::Cancelled);
+    CHECK_THAT(s.error().message, ContainsSubstring("halted"));
+
+    // 要求のあとは、もう読まずに、止める → モータ OFF
+    CHECK(f.api->count("currentJoint") == 3);
+    CHECK(f.api->sequence().ends_with("currentJoint,halt,setMotor"));
+    CHECK_FALSE(f.api->motor_on);
+    CHECK(arm.isConnected());                  // 通信は生きている
+    CHECK(f.api->start[0] < 65.0);             // 目標には着いていない(途中で止まった)
+    CHECK(f.api->start[0] > 0.0);              // 動き出してはいた
+}
+
+TEST_CASE("Rc8: a move that stops short of the target is an error", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.api->async_stop_fraction = 0.5;
+    Rc8Arm& arm = f.connected();
+
+    const Status s = arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::DeviceError);
+    CHECK_THAT(s.error().message, ContainsSubstring("stopped"));
+    CHECK_FALSE(f.api->motor_on);
+    CHECK(arm.isConnected());
+}
+
+TEST_CASE("Rc8: an arm that never starts moving is an error after the grace period", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.api->async_never_starts = true;
+    Rc8Arm& arm = f.connected();
+
+    const Status s = arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::DeviceError);
+    CHECK(f.slept_ms >= f.config.start_grace_ms);   // 動き出すまでの猶予は待つ
+    CHECK_FALSE(f.api->motor_on);
+}
+
+TEST_CASE("Rc8: an abortable move that never ends times out, halts and drops the connection", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.config.move_timeout_ms = 1000;   // 10 回読む間
+    f.api->async_polls = 1000;         // それより長くかかる
+    Rc8Arm& arm = f.connected();
+
+    const Status s = arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::Timeout);
+    CHECK(f.api->count("currentJoint") == 10);
+    CHECK(f.api->called("halt"));
+    CHECK_FALSE(f.api->motor_on);
+    CHECK_FALSE(arm.isConnected());   // 状態が分からないので、再接続を求める
+}
+
+TEST_CASE("Rc8: a communication error while watching an abortable move drops the connection", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.api->fail_at = "currentJoint";
+    f.api->fail_nth = 2;
+    f.api->fail_code = ErrorCode::Communication;
+    f.api->sticky = true;
+    Rc8Arm& arm = f.connected();
+
+    const Status s = arm.moveJ(pose(65, 10, 90, 0, 45, 0), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::Communication);
+    CHECK_FALSE(arm.isConnected());
+    CHECK(f.api->opened == f.api->closed);
+}
+
+TEST_CASE("Rc8: an asynchronous move that is refused leaves the motor off", "[rc8][cancel]") {
+    Fixture f;
+    f.config.abortable_moves = true;
+    f.api->fail_at = "moveJointAsync";
+    Rc8Arm& arm = f.connected();
+
+    const Status s = arm.moveJ(pose(), 0.05);
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::DeviceError);
+    CHECK_FALSE(f.api->motor_on);
+    CHECK(arm.isConnected());
+}
+
+TEST_CASE("Rc8: the abortable-move settings are validated when connecting", "[rc8][cancel]") {
+    Fixture f;
+    SECTION("poll interval") { f.config.poll_interval_ms = 0; }
+    SECTION("settle polls") { f.config.settle_polls = 0; }
+    SECTION("settle tolerance") { f.config.settle_tolerance_deg = 0.0; }
+    const Status s = f.make().connect();
+    REQUIRE_FALSE(s.has_value());
+    CHECK(s.error().code == ErrorCode::InvalidArgument);
+}
+
+TEST_CASE("Ctrl+C becomes a cancel request while the handler is alive", "[cancel]") {
+    auto token = std::make_shared<CancelToken>();
+    {
+        app::ScopedInterruptHandler handler(token);
+        CHECK_FALSE(token->requested());
+        std::raise(SIGINT);   // ハンドラが旗を立てる(プロセスは終わらない)
+        CHECK(token->requested());
+    }
+    // 旗は reset で戻せる
+    token->reset();
+    CHECK_FALSE(token->requested());
+}

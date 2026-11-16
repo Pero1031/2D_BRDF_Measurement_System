@@ -14,7 +14,9 @@
 #include <spdlog/spdlog.h>
 
 #include "brdf/app/DeviceFactory.hpp"
+#include "brdf/app/Interrupt.hpp"
 #include "brdf/app/MeasurementSession.hpp"
+#include "brdf/app/RealRun.hpp"
 #include "brdf/app/ProjectLayout.hpp"
 #include "brdf/calibration/HomographySpotProjector.hpp"
 #include "brdf/io/CalibrationFile.hpp"
@@ -150,7 +152,8 @@ namespace brdf::app {
     Result<PreflightReport> checkProject(const fs::path& dir) {
         auto loaded = loadProject(dir);
         if (!loaded) return tl::unexpected(loaded.error());
-        PreflightReport report = preflight(geometry::RigGeometry(loaded->setup.rig), loaded->recipe);
+        PreflightReport report = preflight(geometry::RigGeometry(loaded->setup.rig), loaded->recipe,
+                                           preflightOptionsFor(loaded->setup));
 
         // ボードで投影する設定なら、全ポーズに校正結果があることも確認する
         if (loaded->setup.calibration.projector == "board") {
@@ -181,7 +184,8 @@ namespace brdf::app {
 
         // 1. 事前検査: 実機を動かす前に、可動域・干渉を確認する
         const geometry::RigGeometry geometry(setup.rig);
-        const PreflightReport report = preflight(geometry, recipe);
+        const PreflightOptions preflight_options = preflightOptionsFor(setup);
+        const PreflightReport report = preflight(geometry, recipe, preflight_options);
         logReport(report);
         if (!report.ok()) {
             return fail(ErrorCode::InvalidArgument,
@@ -189,8 +193,13 @@ namespace brdf::app {
                         + " error(s); nothing was moved. Run `brdf check` for details");
         }
 
-        // 2. 装置の組み立て(real のときはここでエラーになる)と、画像上の位置への変換
-        auto devices = makeDevices(setup, recipe.kind);
+        // 2. 装置の組み立て(real のとき、ドライバのないビルドではここでエラーになる)と、画像上の位置への変換
+        const bool real = setup.mode == io::DeviceMode::Real;
+        const auto cancel = std::make_shared<CancelToken>();
+        std::error_code work_ec;
+        if (real) fs::create_directories(layout.workDir(), work_ec);
+        if (work_ec) return fail(ErrorCode::DeviceError, "cannot create " + layout.workDir().string());
+        auto devices = makeDevices(setup, recipe.kind, real ? layout.workDir() : fs::path{}, cancel);
         if (!devices) return tl::unexpected(devices.error());
         if (setup.calibration.projector == "board") {
             auto projector = loadBoardProjector(layout, *loaded);
@@ -198,7 +207,10 @@ namespace brdf::app {
             devices->projector = *projector;
         }
 
-        // 3. 測定前の確認(旧システムの「準備はできましたか → OK」)
+        // 3a. 実機のアームを動かす前の確認(装置、速度、動かす範囲、中止の方法)。--yes でも省略できない
+        if (auto s = confirmRealMotion(setup, recipe, in); !s) return tl::unexpected(s.error());
+
+        // 3b. 測定前の確認(旧システムの「準備はできましたか → OK」)
         if (!options.assume_yes && !recipe.checklist.empty()) {
             std::cout << "測定前の確認:\n";
             for (std::size_t i = 0; i < recipe.checklist.size(); ++i) {
@@ -216,7 +228,12 @@ namespace brdf::app {
         spdlog::info("Running \"{}\" ({}): {} pose(s) x {} spot(s), devices = {}",
                      recipe.name, domain::toString(recipe.kind), recipe.poses.size(), recipe.spots.size(),
                      io::toString(setup.mode));
-        MeasurementSession session(geometry, std::move(*devices), recipe);
+        SessionOptions session_options;
+        session_options.check_start_path = real;   // 実機: 接続のあと、アームの実際の位置から最初の姿勢までを検査する
+        session_options.preflight = preflight_options;
+        session_options.cancel = cancel;
+        ScopedInterruptHandler interrupt(cancel);   // Ctrl+C で、次の姿勢へ進まずに(動作中も、設定によっては)止まる
+        MeasurementSession session(geometry, std::move(*devices), recipe, session_options);
         auto result = session.run([](int done, int total, const domain::PoseStep& next) {
             if (done < total) spdlog::info("pose {}/{} (\"{}\")", done + 1, total, next.id);
         });

@@ -35,10 +35,23 @@ namespace brdf::app {
 
     } // namespace
 
-    Result<Devices> makeDevices(const io::SetupConfig& setup, domain::MeasurementKind kind) {
+    Result<Devices> makeDevices(const io::SetupConfig& setup, domain::MeasurementKind kind, const std::filesystem::path& work_dir,
+                                std::shared_ptr<CancelToken> cancel) {
         if (setup.mode == io::DeviceMode::Real) {
-            return fail(ErrorCode::NotImplemented,
-                        "devices.mode = \"real\" is not connected to the measurement run yet (the arm and spectroradiometer drivers exist but have not been tried on the real devices); use \"sim\"");
+            // 実機。どの装置のドライバがビルドされていないかは、それぞれの工場関数のエラーが案内する
+            auto left = makeRc8Arm(setup, RealArm::Left, cancel);
+            if (!left) return tl::unexpected(left.error());
+            auto right = makeRc8Arm(setup, RealArm::Right, cancel);
+            if (!right) return tl::unexpected(right.error());
+            auto imager = makeTopconImager(setup, work_dir);
+            if (!imager) return tl::unexpected(imager.error());
+
+            Devices d;
+            d.left_arm = *left;
+            d.right_arm = *right;
+            d.imager = *imager;
+            // projector は、校正結果(ホモグラフィ)を読み込んだ側が設定する(実機は [calibration] projector = "board" が必須)
+            return d;
         }
 
         // カメラ: 位置は装置の配置から、向きは設定、無ければ既定
@@ -96,15 +109,20 @@ driver::topcon::TopconImagerConfig makeTopconConfig(const io::SetupConfig& setup
         c.move_timeout_ms = ct.move_timeout_ms;
         c.limits = setup.rig.joint_limits;
         c.arrival_tolerance_deg = ct.arrival_tolerance_deg;
+        c.max_speed = ct.max_speed;
+        c.abortable_moves = ct.abortable_moves;
         return c;
     }
 
-    Result<std::shared_ptr<driver::IRobotArm>> makeRc8Arm(const io::SetupConfig& setup, RealArm arm) {
+    Result<std::shared_ptr<driver::IRobotArm>> makeRc8Arm(const io::SetupConfig& setup, RealArm arm,
+                                                          std::shared_ptr<CancelToken> cancel) {
 #ifdef BRDF_WITH_BCAP
-        return std::make_shared<driver::rc8::Rc8Arm>(std::make_shared<driver::rc8::RealBcapApi>(), makeRc8Config(setup, arm));
+        return std::make_shared<driver::rc8::Rc8Arm>(std::make_shared<driver::rc8::RealBcapApi>(), makeRc8Config(setup, arm),
+                                                     std::move(cancel));
 #else
         (void)setup;
         (void)arm;
+        (void)cancel;
         return fail(ErrorCode::NotImplemented,
                     "this build has no b-CAP support (configure with -DBRDF_WITH_BCAP=ON -DBCAP_SDK_DIR=<b-CAP SDK folder>)");
 #endif
@@ -113,6 +131,10 @@ driver::topcon::TopconImagerConfig makeTopconConfig(const io::SetupConfig& setup
     Result<std::shared_ptr<driver::ISpectralImager>> makeTopconImager(const io::SetupConfig& setup,
                                                                       const std::filesystem::path& work_dir) {
 #ifdef BRDF_WITH_TOPCON
+        if (work_dir.empty()) {
+            // 空のままだと、レシピなどの XML が、実行したフォルダに書かれてしまう
+            return fail(ErrorCode::InvalidArgument, "the spectroradiometer needs a work folder for its temporary files");
+        }
         return std::make_shared<driver::topcon::TopconImager>(std::make_shared<driver::topcon::RealHsApi>(),
                                                               makeTopconConfig(setup, work_dir));
 #else

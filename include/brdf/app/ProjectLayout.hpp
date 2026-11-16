@@ -36,6 +36,8 @@ namespace brdf::app {
         std::filesystem::path calibrationFile() const { return calibrationDir() / "homographies.csv"; }
         std::filesystem::path calibrationImagesDir() const { return calibrationDir() / "images"; }
         std::filesystem::path resultRoot() const { return root_ / "result"; }
+        /// 実機の分光放射計が、レシピやスポット定義の XML を一時的に書く場所(実機モードのときだけ作る)。
+        std::filesystem::path workDir() const { return root_ / "work"; }
 
         /// フォルダ(calibration / result)を作る。既にあれば何もしない。
         Status createFolders() const;

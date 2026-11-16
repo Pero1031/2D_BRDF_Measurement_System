@@ -29,6 +29,7 @@ namespace brdf::driver::rc8 {
         Status setMotor(const BcapRobot& robot, bool on) override;
         Status setExtSpeed(const BcapRobot& robot, double percent) override;
         Status moveJoint(const BcapRobot& robot, const Degrees6& target) override;
+        Status moveJointAsync(const BcapRobot& robot, const Degrees6& target) override;
         Result<Degrees6> currentJoint(const BcapRobot& robot) override;
         Status halt(const BcapRobot& robot) override;
     };

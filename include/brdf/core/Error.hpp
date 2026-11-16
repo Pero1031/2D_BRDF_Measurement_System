@@ -24,6 +24,7 @@ namespace brdf {
         Timeout,            ///< 通信が時間内に終わらなかった(装置の状態は不明。動作中だったかもしれない)
         Communication,      ///< 通信ができない・途切れた(接続できない、切断された など)
         Saturated,          ///< 測定値が飽和した(明るすぎる。照明・積分時間・ND フィルタを見直す)
+        Cancelled,          ///< 利用者の要求(Ctrl+C など)で中止した
         NotImplemented,     ///< 未実装
     };
 
@@ -39,6 +40,7 @@ namespace brdf {
         case ErrorCode::Timeout:         return "Timeout";
         case ErrorCode::Communication:   return "Communication";
         case ErrorCode::Saturated:       return "Saturated";
+        case ErrorCode::Cancelled:       return "Cancelled";
         case ErrorCode::NotImplemented:  return "NotImplemented";
         }
         return "Unknown";

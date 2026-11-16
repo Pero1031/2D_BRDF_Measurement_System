@@ -61,6 +61,8 @@ robot_name = "Arm"   # コントローラの中のロボット名
 command_timeout_ms = 5000   # 1 回の命令を待つ時間(モータ ON/OFF、速度設定、角度の取得)
 move_timeout_ms = 180000   # 移動(動作が終わるまで戻らない)を待つ時間。遅い速度で遠くへ動かすと長くかかる
 arrival_tolerance_deg = 1.0   # 移動のあと、実際の関節角と目標の差がこれを超えたらエラー
+max_speed = 0.05   # 速度の上限(割合)。recipe.toml の arm_speed がこれより大きくても、この速度で動かす。最初は 0.05(5%)
+abortable_moves = false   # true: 移動を非同期で始めて、動作中でも Ctrl+C で止められるようにする(実機で確かめてから)
 
 [analysis]   # brdf analyze の設定
 white_reflectance = 0.99   # 標準拡散反射板の反射率(BRDF = 放射輝度率 x 反射率 / pi)

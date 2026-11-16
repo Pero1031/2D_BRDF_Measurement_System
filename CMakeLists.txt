@@ -70,6 +70,9 @@ add_library(brdf_core
     src/app/MeasurementSession.cpp
     src/app/DeviceFactory.cpp
     src/app/ResultFiles.cpp
+    src/app/Interrupt.cpp
+    src/app/RealRun.cpp
+    src/app/ArmCommands.cpp
     src/app/ProjectLayout.cpp
     src/app/Commands.cpp
     src/calibration/BoardLayout.cpp

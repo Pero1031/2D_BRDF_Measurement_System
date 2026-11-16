@@ -6,10 +6,13 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <vector>
 
 #include "brdf/app/AngleTable.hpp"
 #include "brdf/app/Devices.hpp"
+#include "brdf/app/Preflight.hpp"
+#include "brdf/core/Cancel.hpp"
 #include "brdf/core/Error.hpp"
 #include "brdf/domain/Recipe.hpp"
 #include "brdf/geometry/RigGeometry.hpp"
@@ -35,24 +38,40 @@ namespace brdf::app {
     /// 測定の進み具合の通知: (終わったポーズ数, 全ポーズ数, いま取りかかるポーズ)。
     using ProgressFn = std::function<void(int done, int total, const domain::PoseStep& next)>;
 
+    /// 測定の実行時の設定。
+    struct SessionOptions {
+        /// true なら、接続した直後に、アームの**実際の位置**から最初の姿勢までの道のりを検査して、
+        /// 問題があれば何も動かさずに失敗する。実機では必ず true にする(シミュレータの初期位置は決まっているので不要)。
+        bool check_start_path = false;
+        PreflightOptions preflight;
+
+        /// 中止の旗(Ctrl+C など)。立つと、次の姿勢へ進まずに Cancelled で止まる。アームの移動の途中での停止は、
+        /// アームのドライバが旗を見て行う(Rc8ArmConfig::abortable_moves)。
+        std::shared_ptr<CancelToken> cancel;
+    };
+
     /// レシピを装置で実行する。旧システムの Measuring() に相当する。
     ///
     /// ポーズごとに、(1) 左アーム → 右アームの順に移動、(2) 試料までの距離を計算、
     /// (3) 測定点を画像上の位置へ変換、(4) 撮影、(5) 点ごとの角度を計算、して結果にまとめる。
-    /// 途中で失敗したら、どのポーズ・どの段階かを含むエラーで止まる。装置は必ず切断する。
+    /// 途中で失敗したら、どのポーズ・どの段階かを含むエラーで止まる。失敗したときは、アームを止めてから、装置を必ず切断する。
     class MeasurementSession {
     public:
-        MeasurementSession(geometry::RigGeometry geometry, Devices devices, domain::Recipe recipe);
+        MeasurementSession(geometry::RigGeometry geometry, Devices devices, domain::Recipe recipe,
+                           SessionOptions options = {});
 
         Result<SessionResult> run(const ProgressFn& progress = {});
 
     private:
         Status connectAll();
         void disconnectAll();
+        Result<SessionResult> runPoses(const ProgressFn& progress);
+        bool cancelled() const { return options_.cancel && options_.cancel->requested(); }
 
         geometry::RigGeometry geometry_;
         Devices devices_;
         domain::Recipe recipe_;
+        SessionOptions options_;
     };
 
 } // namespace brdf::app

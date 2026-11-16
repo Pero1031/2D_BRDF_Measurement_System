@@ -143,6 +143,15 @@ namespace brdf::driver::rc8 {
             return execute(robot, command, param, result);
         }
 
+        /// bCap_RobotMove(補間 1 = 関節補間)。option は "" か "NEXT"。
+        Status moveWithOption(const BcapRobot& robot, const Degrees6& target, const char* option_text) {
+            Variant pose;
+            if (!pose.setString(jointMoveCommand(target))) return tl::unexpected(memoryError("bCap_RobotMove"));
+            const Bstr option{option_text};
+            if (!option.ok()) return tl::unexpected(memoryError("bCap_RobotMove"));
+            return check("bCap_RobotMove", bCap_RobotMove(robot.fd, robot.handle, 1, pose.get(), option.get()));
+        }
+
     } // namespace
 
     Result<int> RealBcapApi::open(const std::string& address, int timeout_ms, int retry) {
@@ -217,11 +226,13 @@ namespace brdf::driver::rc8 {
     // 旧システムと同じ、補間方法 1(関節補間)と、文字列 "J(...)" の目標。オプションは空。
     // 動作が終わるまで戻らない(旧システムはこれを前提に、次の測定へ進んでいた)。
     Status RealBcapApi::moveJoint(const BcapRobot& robot, const Degrees6& target) {
-        Variant pose;
-        if (!pose.setString(jointMoveCommand(target))) return tl::unexpected(memoryError("bCap_RobotMove"));
-        const Bstr option{""};
-        if (!option.ok()) return tl::unexpected(memoryError("bCap_RobotMove"));
-        return check("bCap_RobotMove", bCap_RobotMove(robot.fd, robot.handle, 1, pose.get(), option.get()));
+        return moveWithOption(robot, target, "");
+    }
+
+    // 動作の完了を待たない移動。オプション "NEXT" が、旧システムでは使っていない、この実装で初めて使うもの。
+    // 本当に待たずに戻るかは、実機で確かめる(待ってしまっても、Rc8Arm の監視は正しく終わる)。
+    Status RealBcapApi::moveJointAsync(const BcapRobot& robot, const Degrees6& target) {
+        return moveWithOption(robot, target, "NEXT");
     }
 
     // DENSO のサンプル(bCapSlaveMove.c)と同じ、引数なしの "CurJnt"。double の配列(J1..J8)が返る。

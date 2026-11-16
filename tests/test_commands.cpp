@@ -247,7 +247,13 @@ TEST_CASE("run in real mode fails clearly and saves nothing", "[commands]") {
     std::istringstream in;
     const auto r = runProject(dir, yes(), in);
     REQUIRE_FALSE(r.has_value());
+#if defined(BRDF_WITH_BCAP) && defined(BRDF_WITH_TOPCON)
+    // 両方のドライバがあるビルド: この設定には校正結果がないので、装置に接続する前に止まる(校正があっても、
+    // 動かす前の確認で OK の入力がなければ止まる)。どちらにしても、何も接続せず、何も動かさない
+    CHECK(r.error().code == ErrorCode::InvalidArgument);
+#else
     CHECK(r.error().code == ErrorCode::NotImplemented);
+#endif
     CHECK(resultFolders(dir).empty());
 }
 

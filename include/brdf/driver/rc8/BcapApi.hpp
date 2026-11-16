@@ -70,6 +70,9 @@ namespace brdf::driver::rc8 {
         virtual Status setExtSpeed(const BcapRobot& robot, double percent) = 0;
         /// bCap_RobotMove(関節補間)。**動作が終わるまで戻らない**。
         virtual Status moveJoint(const BcapRobot& robot, const Degrees6& target) = 0;
+        /// bCap_RobotMove(関節補間)を、**動作の完了を待たずに**始める(オプション "NEXT"。RC8 のマニュアルでは「非同期で移動」)。
+        /// 戻ったあとは、currentJoint で進み具合を見る。止めるのは halt。実機での動作は未確認(docs/Rc8ArmDesign.md)。
+        virtual Status moveJointAsync(const BcapRobot& robot, const Degrees6& target) = 0;
         /// "CurJnt"。エンコーダで検出した現在の関節角 [度]。
         virtual Result<Degrees6> currentJoint(const BcapRobot& robot) = 0;
         /// bCap_RobotHalt。動作を止める。

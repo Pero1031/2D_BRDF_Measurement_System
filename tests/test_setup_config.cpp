@@ -45,6 +45,8 @@ namespace {
         CHECK(a.controllers.command_timeout_ms == b.controllers.command_timeout_ms);
         CHECK(a.controllers.move_timeout_ms == b.controllers.move_timeout_ms);
         CHECK_THAT(a.controllers.arrival_tolerance_deg, WithinAbs(b.controllers.arrival_tolerance_deg, 1e-12));
+        CHECK_THAT(a.controllers.max_speed, WithinAbs(b.controllers.max_speed, 1e-12));
+        CHECK(a.controllers.abortable_moves == b.controllers.abortable_moves);
         CHECK_THAT(a.spot_xml.spot_size, WithinAbs(b.spot_xml.spot_size, 1e-12));
         CHECK_THAT(a.analysis.white_reflectance, WithinAbs(b.analysis.white_reflectance, 1e-12));
         CHECK_THAT(a.analysis.min_wavelength_nm, WithinAbs(b.analysis.min_wavelength_nm, 1e-12));
@@ -208,6 +210,9 @@ TEST_CASE("setup errors name the file, the section and the key", "[config]") {
         CHECK_THAT(errorOf("[controllers]\ncommand_timeout_ms = 0\n"), ContainsSubstring("timeout"));
         CHECK_THAT(errorOf("[controllers]\nmove_timeout_ms = -5\n"), ContainsSubstring("timeout"));
         CHECK_THAT(errorOf("[controllers]\narrival_tolerance_deg = 0\n"), ContainsSubstring("arrival_tolerance_deg"));
+        CHECK_THAT(errorOf("[controllers]\nmax_speed = 0\n"), ContainsSubstring("max_speed"));
+        CHECK_THAT(errorOf("[controllers]\nmax_speed = 1.5\n"), ContainsSubstring("max_speed"));
+        CHECK_THAT(errorOf("[controllers]\nabortable_moves = \"yes\"\n"), ContainsSubstring("true or false"));
         CHECK_THAT(errorOf("[controllers]\nlefthost = \"1.2.3.4\"\n"), ContainsSubstring("unknown key 'lefthost'"));
     }
     SECTION("unknown sample model") {

@@ -5,9 +5,13 @@
 
 #include "brdf/driver/rc8/Rc8Arm.hpp"
 
+#include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <cmath>
+#include <optional>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -29,6 +33,12 @@ namespace brdf::driver::rc8 {
 
         geometry::Joints fromDegreeArray(const Degrees6& d) {
             return geometry::jointsFromDegrees(d[0], d[1], d[2], d[3], d[4], d[5]);
+        }
+
+        double maxAbsDiff(const Degrees6& a, const Degrees6& b) {
+            double d = 0.0;
+            for (std::size_t i = 0; i < 6; ++i) d = std::max(d, std::abs(a[i] - b[i]));
+            return d;
         }
 
         std::string fixed(double v, int digits) {
@@ -60,7 +70,8 @@ namespace brdf::driver::rc8 {
         return s;
     }
 
-    Rc8Arm::Rc8Arm(std::shared_ptr<IBcapApi> api, Rc8ArmConfig config) : api_(std::move(api)), config_(std::move(config)) {}
+    Rc8Arm::Rc8Arm(std::shared_ptr<IBcapApi> api, Rc8ArmConfig config, std::shared_ptr<CancelToken> cancel)
+        : api_(std::move(api)), config_(std::move(config)), cancel_(std::move(cancel)) {}
 
     Rc8Arm::~Rc8Arm() { disconnect(); }
 
@@ -71,6 +82,14 @@ namespace brdf::driver::rc8 {
         if (config_.port < 1 || config_.port > 65535) return fail(ErrorCode::InvalidArgument, label() + ": the port must be 1..65535");
         if (config_.command_timeout_ms <= 0 || config_.move_timeout_ms <= 0 || config_.retry < 0) {
             return fail(ErrorCode::InvalidArgument, label() + ": the timeouts must be positive and retry must not be negative");
+        }
+
+        if (!(config_.max_speed > 0.0 && config_.max_speed <= 1.0)) {
+            return fail(ErrorCode::InvalidArgument, label() + ": max_speed must be in (0, 1]");
+        }
+        if (config_.poll_interval_ms <= 0 || config_.settle_polls < 1 || config_.start_grace_ms < 0 ||
+            !(config_.settle_tolerance_deg > 0.0)) {
+            return fail(ErrorCode::InvalidArgument, label() + ": the polling settings must be positive");
         }
 
         const std::string address = bcapAddress(config_.host, config_.port);
@@ -169,8 +188,68 @@ namespace brdf::driver::rc8 {
         return {};
     }
 
+    void Rc8Arm::pause(int ms) const {
+        if (config_.sleep_ms) {
+            config_.sleep_ms(ms);
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+        }
+    }
+
+    Status Rc8Arm::moveAbortable(const Degrees6& target) {
+        if (const auto s = api_->moveJointAsync(link_.robot, target); !s) return s;
+
+        const int interval = config_.poll_interval_ms;
+        const int max_polls = (config_.move_timeout_ms + interval - 1) / interval;
+        const int grace_polls = (config_.start_grace_ms + interval - 1) / interval;
+
+        std::optional<Degrees6> previous;
+        int stable = 0;          // 連続で、関節角が止まっていた回数
+        bool moved = false;      // 一度でも、動いているのを見たか
+
+        for (int poll = 0; poll < max_polls; ++poll) {
+            // 中止の要求があれば、止める。ここで止めるために、移動を非同期にしている
+            if (cancel_ && cancel_->requested()) {
+                if (const auto h = api_->halt(link_.robot); !h) return tl::unexpected(h.error());
+                return fail(ErrorCode::Cancelled, "cancelled while the arm was moving; it was halted before the target");
+            }
+
+            pause(interval);
+            const auto now = api_->currentJoint(link_.robot);
+            if (!now) return tl::unexpected(now.error());
+
+            if (previous) {
+                if (maxAbsDiff(*now, *previous) < config_.settle_tolerance_deg) {
+                    ++stable;
+                } else {
+                    stable = 0;
+                    moved = true;
+                }
+            }
+            previous = *now;
+
+            if (stable >= config_.settle_polls) {
+                if (maxAbsDiff(*now, target) <= config_.arrival_tolerance_deg) return {};   // 目標で止まった
+                // 止まっているのに、目標にいない: 動き出す前(grace の間)でなければ、動作が途中で止まった
+                if (moved || poll >= grace_polls) {
+                    for (std::size_t i = 0; i < 6; ++i) {
+                        if (std::abs((*now)[i] - target[i]) > config_.arrival_tolerance_deg) {
+                            return fail(ErrorCode::DeviceError,
+                                        "the arm stopped but J" + std::to_string(i + 1) + " is at " + fixed((*now)[i], 3) +
+                                            " deg, not at the target " + fixed(target[i], 3) + " deg");
+                        }
+                    }
+                }
+            }
+        }
+        return fail(ErrorCode::Timeout, "the move did not finish within " + std::to_string(config_.move_timeout_ms) + " ms");
+    }
+
     Status Rc8Arm::moveJ(const geometry::Joints& target, Real speed) {
         if (!connected_) return fail(ErrorCode::NotConnected, label() + ": not connected");
+        if (cancel_ && cancel_->requested()) {
+            return fail(ErrorCode::Cancelled, label() + ": cancelled before the move (nothing was sent)");
+        }
         if (!(speed > 0.0 && speed <= 1.0)) {
             return fail(ErrorCode::InvalidArgument, label() + ": speed must be in (0, 1]");
         }
@@ -189,7 +268,18 @@ namespace brdf::driver::rc8 {
 
         const Degrees6 degrees = toDegreeArray(target);
 
-        if (const auto s = api_->setExtSpeed(link_.robot, speed * 100.0); !s) {
+        // 速度の上限。超えていたら、上限の速度で動かす
+        Real effective = speed;
+        if (speed > config_.max_speed) {
+            effective = config_.max_speed;
+            if (!speed_capped_warned_) {
+                speed_capped_warned_ = true;
+                spdlog::warn("[{}] the requested speed {:.0f}% is above the limit; moving at {:.0f}% (setup.toml [controllers] max_speed)",
+                             label(), speed * 100.0, config_.max_speed * 100.0);
+            }
+        }
+
+        if (const auto s = api_->setExtSpeed(link_.robot, effective * 100.0); !s) {
             return tl::unexpected(handleError(s.error(), "setting the speed"));
         }
         if (const auto s = api_->setMotor(link_.robot, true); !s) {
@@ -197,7 +287,7 @@ namespace brdf::driver::rc8 {
         }
 
         // ここからは、結果にかかわらず、モータを OFF に戻す(OFF のあいだは、ブレーキがかかっている)
-        const Status result = moveAndCheck(degrees);
+        const Status result = config_.abortable_moves ? moveAbortable(degrees) : moveAndCheck(degrees);
         if (!result && isLinkError(result.error().code)) {
             // 時間切れのときは、まだ動いているかもしれない。通信が生きているうちに、止めに行く
             if (const auto h = api_->halt(link_.robot); !h) {
@@ -210,7 +300,7 @@ namespace brdf::driver::rc8 {
         if (!result) return tl::unexpected(handleError(result.error(), "moveJ"));
         if (!off) return tl::unexpected(handleError(off.error(), "the move finished, but Motor off"));
 
-        spdlog::debug("[{}] moveJ done (speed {:.2f})", label(), speed);
+        spdlog::debug("[{}] moveJ done (speed {:.2f})", label(), effective);
         return {};
     }
 
