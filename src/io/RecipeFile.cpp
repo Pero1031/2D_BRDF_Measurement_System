@@ -42,7 +42,7 @@ namespace brdf::io {
             if (r.spots.empty()) return err("no spots: add [[spots]] entries or a [spot_grid]");
 
             const auto& c = r.capture;
-            if (!(c.integration_time_ms > 0.0)) return err("[capture] integration_time_ms must be positive");
+            if (!(c.integration_time_ms >= 0.0)) return err("[capture] integration_time_ms must not be negative (0 = automatic)");
             if (!(c.arm_speed > 0.0 && c.arm_speed <= 1.0)) return err("[capture] arm_speed must be in (0, 1]");
             const auto& w = c.wavelengths;
             if (!(w.step > 0.0) || !(w.end >= w.start) || !(w.start > 0.0)) {
@@ -197,7 +197,7 @@ namespace brdf::io {
         o << "]\n\n";
 
         o << "[capture]\n"
-          << "integration_time_ms = " << num(r.capture.integration_time_ms) << "\n"
+          << "integration_time_ms = " << num(r.capture.integration_time_ms) << "   # 0 = 装置が自動で決める\n"
           << "arm_speed = " << num(r.capture.arm_speed) << "   # 0 より大きく 1 以下\n"
           << "wavelength_start = " << num(r.capture.wavelengths.start) << "\n"
           << "wavelength_end = " << num(r.capture.wavelengths.end) << "\n"

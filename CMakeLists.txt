@@ -57,6 +57,8 @@ add_library(brdf_core
     src/io/RecipeFile.cpp
     src/io/CalibrationFile.cpp
     src/io/SpotXml.cpp
+    src/io/TopconRecipeXml.cpp
+    src/driver/topcon/TopconImager.cpp
     src/io/MeasurementsCsv.cpp
     src/analysis/RadianceFactor.cpp
     src/app/Analyze.cpp
@@ -84,6 +86,24 @@ target_link_libraries(brdf_core PUBLIC
     spdlog::spdlog
     tl::expected
     tomlplusplus::tomlplusplus)
+
+# ---------------------------------------------------------------------------
+# 実機の分光放射計(TOPCON SDK)。SDK がある PC だけで ON にする。
+#   cmake --preset default -DBRDF_WITH_TOPCON=ON -DHS_SDK_DIR=<SDK のフォルダ>
+# HS_SDK_DIR は、include/hs_api.h と lib/hs_api.lib の親(CI-100 インストーラの SDK\c)。
+# 実行時には、同じ版の hs_api.dll(x64)が brdf.exe のそばか PATH 上に必要。
+# ---------------------------------------------------------------------------
+option(BRDF_WITH_TOPCON "Build the real TOPCON SDK driver (needs the SDK)" OFF)
+set(HS_SDK_DIR "" CACHE PATH "Folder of the TOPCON SDK (contains include/hs_api.h and lib/hs_api.lib)")
+if(BRDF_WITH_TOPCON)
+    if(NOT EXISTS "${HS_SDK_DIR}/include/hs_api.h" OR NOT EXISTS "${HS_SDK_DIR}/lib/hs_api.lib")
+        message(FATAL_ERROR "BRDF_WITH_TOPCON=ON needs -DHS_SDK_DIR=<folder with include/hs_api.h and lib/hs_api.lib>")
+    endif()
+    target_sources(brdf_core PRIVATE src/driver/topcon/RealHsApi.cpp)
+    target_include_directories(brdf_core PRIVATE "${HS_SDK_DIR}/include")
+    target_link_libraries(brdf_core PUBLIC "${HS_SDK_DIR}/lib/hs_api.lib")
+    target_compile_definitions(brdf_core PUBLIC BRDF_WITH_TOPCON=1)
+endif()
 
 # toml++ のヘッダは src/io 内だけで使う(公開ヘッダには出さない)が、リンクは必要
 target_compile_definitions(brdf_core PUBLIC BRDF_VERSION="${PROJECT_VERSION}")

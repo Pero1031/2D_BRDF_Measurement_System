@@ -377,3 +377,6 @@ CMakeUserPresets.json
 # Results of the example project are generated, not tracked
 examples/sim_project/result/*
 !examples/sim_project/result/.gitkeep
+
+# Extra build folders (e.g. the TOPCON SDK variant)
+build-*/

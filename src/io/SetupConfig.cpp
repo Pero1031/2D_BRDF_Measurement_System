@@ -57,6 +57,9 @@ namespace brdf::io {
             if (im.lens != "WIDE" && im.lens != "STANDARD" && im.lens != "TELE" && im.lens != "MACRO") {
                 return fail(ErrorCode::InvalidArgument, "setup: [imager] lens must be \"WIDE\", \"STANDARD\", \"TELE\" or \"MACRO\"");
             }
+            if (im.calibration_dir.empty()) {
+                return fail(ErrorCode::InvalidArgument, "setup: [imager] calibration_dir must not be empty");
+            }
             if (im.width() <= 0 || im.height() <= 0) {
                 return fail(ErrorCode::InvalidArgument, "setup: [imager] image_width and image_height must be positive");
             }
@@ -222,6 +225,7 @@ namespace brdf::io {
             BRDF_TRY(s->string("device", c.imager.device));
             BRDF_TRY(s->string("binning", c.imager.binning));
             BRDF_TRY(s->string("lens", c.imager.lens));
+            BRDF_TRY(s->string("calibration_dir", c.imager.calibration_dir));
             if (s->has("image_width")) {
                 int v = 0;
                 BRDF_TRY(s->integer("image_width", v));
@@ -386,6 +390,12 @@ namespace brdf::io {
           << "device = " << quote(c.imager.device) << "   # \"SR5100\"(最新、2448x2048) または \"SR5000\"(1376x1024)\n"
           << "binning = " << quote(c.imager.binning) << "   # \"BINNING_TYPE1\" / \"BINNING_TYPE2\" / \"BINNING_TYPE4\"\n"
           << "lens = " << quote(c.imager.lens) << "   # \"WIDE\" / \"STANDARD\" / \"TELE\" / \"MACRO\"\n";
+        // 既定値(インストーラの標準の場所 = 絶対パス)は書かない。変えたときだけ書く
+        if (c.imager.calibration_dir != ImagerConfig{}.calibration_dir) {
+            o << "calibration_dir = " << quote(c.imager.calibration_dir) << "   # 実機: TOPCON SDK の校正データのフォルダ\n";
+        } else {
+            o << "# calibration_dir = \"<校正データのフォルダ>\"   # 実機: TOPCON SDK の校正データ。省略すると、インストーラの標準の場所\n";
+        }
         if (c.imager.image_width) o << "image_width = " << *c.imager.image_width << "\n";
         else o << "# image_width = " << c.imager.width() << "   # 省略すると、機種とビニングから決まる\n";
         if (c.imager.image_height) o << "image_height = " << *c.imager.image_height << "\n";

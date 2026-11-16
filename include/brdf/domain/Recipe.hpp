@@ -52,7 +52,7 @@ namespace brdf::domain {
 
     /// 撮影条件。
     struct CaptureSettings {
-        Real integration_time_ms = 100.0;       ///< 積分時間
+        Real integration_time_ms = 100.0;       ///< 積分時間。0 のときは装置が自動で決める
         Real arm_speed = 0.5;                   ///< アームの速度(0 より大きく 1 以下)
         driver::WavelengthRange wavelengths;    ///< 波長範囲
     };

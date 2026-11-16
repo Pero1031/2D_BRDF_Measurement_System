@@ -116,10 +116,12 @@ SDK には 2 も揃っている(`hsLoadSpotDef`、`hsSetMeasurementStandardSpotD
 
 旧のキャリブ画像(`CalibBoard/N.png`、1376×1024)がどの方法で撮られたかは不明。
 **まず A で作る**(コードが少ない)。円の検出は 8 ビットで足りる。必要になれば B を足す。
-`ImageRequest::integration_time_ms` が 0 以下なら、既定値(10 ms 程度、live_view の例と同じ)にするか、`hsOptimizeThroughLive` で決める(後者は §8 で確認)。
+`ImageRequest::integration_time_ms` が 0 のときは、`TopconImagerConfig::live_integration_ms`(既定 10 ms、live_view の例と同じ)を使う。`hsOptimizeThroughLive` で自動にする案は §8 で確認する。
 
 画像の向き: `HsImage8u3` は左上が原点、行は上から下、RGB の順で 3 バイト/画素(`live_view` の描画コードから)。
 `brdf::GrayImage` は同じ向き。
+
+実装(`RealHsApi::captureLiveImage`)では、設定を変えた直後の画像が古いかもしれないので、3 枚撮って最後の 1 枚を使う。グレーへの変換は 3 チャンネルの単純平均(R,G,B の並び順がヘッダの説明と `live_view` の例で食い違っているため、順番によらない方法にした)。
 
 ## 4. レシピの作り方
 
@@ -144,7 +146,7 @@ SDK には 2 も揃っている(`hsLoadSpotDef`、`hsSetMeasurementStandardSpotD
 
 `CaptureRequest::spots` は画像上の位置(pixel)。SDK のスポット定義(`HsSpotDef`)は構造が大きいので、**メモリ上で組み立てずに、既にある `io::SpotXml`(旧の XML と同じ形式を書き出せる。旧データで検証済み)で一時ファイルに書き、`hsLoadSpotDef` で読む**。
 
-- 一時ファイルの置き場所は、プロジェクトの `result/<日時>/` の下(`.gitignore` 済み)。絶対パスは使わない。
+- 一時ファイルの置き場所は `TopconImagerConfig::work_dir`(呼び出し側が決める。プロジェクトの `result/<日時>/` の下にするのが自然)。ファイル名は `recipe.xml` と `spots.xml`。測定のたびに上書きされるので、あとから見たいときは呼び出し側がコピーする。
 - スポットの大きさは `[spot_xml].spot_size`(既存)。
 - SDK の標準スポット(`HS_SPOT_DATA_TYPE_STANDARD`)として設定する。旧の GUI も標準スポットの XML を使っていた。
 
@@ -205,11 +207,32 @@ tests/ test_topcon_imager.cpp  …… フェイクの ITopconApi で、手順・
 読む場合は、`pip install cryptography` のあと、`pypdf` で本文を取り出せる(このリポジトリには入れない)。
 その結果は、この表の 1・2・3・7・10 に効くはず。
 
-## 9. 次の作業
+## 9. 実装の状況
+
+② は実装済み(2026-11)。
+
+| 部品 | 場所 |
+|---|---|
+| SDK の窓口(`ITopconApi`) | `include/brdf/driver/topcon/HsApi.hpp` |
+| 実機用(SDK の関数を呼ぶ。`hs_api.h` を include するのはここだけ) | `src/driver/topcon/RealHsApi.cpp`(`BRDF_WITH_TOPCON=ON` のときだけビルド) |
+| `ISpectralImager` の実装 | `src/driver/topcon/TopconImager.cpp` |
+| レシピ XML | `src/io/TopconRecipeXml.cpp`(旧の `recipe.xml` と一致するテストあり。`tests/data/legacy_recipe.xml`) |
+| フェイクでのテスト | `tests/test_topcon_imager.cpp`、`tests/test_topcon_recipe_xml.cpp` |
+| 設定 | `[imager] calibration_dir`(省略すると SDK の標準の場所)、`[capture] integration_time_ms = 0` が自動 |
+
+設計からの変更点:
+
+- `ErrorCode::Saturated` を足した(飽和は `DeviceError` と分けた)。
+- 積分時間 0 = 自動を、`recipe.toml`、`CaptureRequest`、シミュレータまで通した(旧システムは自動だったため)。
+- `hsGetSpotData` の呼び方は仮説のまま(§8 の 1)。`spot_id` に添字を入れて呼び、同じ点が 2 回返ってきたらエラーにする検査を入れた。
+- SDK 付きでビルドしたテストの実行ファイルは `hs_api.dll` に依存するので、`hs_api.dll` のある場所を `PATH` に入れないと起動できない。
+- SDK 付きのビルドで、`RealHsApi.cpp` のコンパイルと、`hs_api.lib` とのリンクができることは確認した(SDK のある PC)。実機は未接続。
+
+## 10. 次の作業
 
 | 段階 | 内容 | 実機 |
 |---|---|---|
-| ② | `ITopconApi`、`TopconImager`、レシピ XML の書き出し(旧の `recipe.xml` と一致するテスト)、フェイクでのテスト | 不要 |
+| ② | `ITopconApi`、`TopconImager`、レシピ XML の書き出し(旧の `recipe.xml` と一致するテスト)、フェイクでのテスト — **済** | 不要 |
 | ③ | `Rc8Arm`(b-CAP。接続はセッションにつき 1 回。関節角は度の double。速度は ExtSpeed) | 不要(ビルドまで) |
 | ④ | 両方のエラー・タイムアウト・切断のテスト | 不要 |
 | ⑤ | 実機のアームを低速で 1 回動かす(安全確認から) | **必要** |
@@ -218,7 +241,7 @@ tests/ test_topcon_imager.cpp  …… フェイクの ITopconApi で、手順・
 
 ② の受け入れ基準:
 
-- `BRDF_WITH_TOPCON=OFF` の既存のビルドとテストが今まで通り通る(137 件)。
+- `BRDF_WITH_TOPCON=OFF` の既存のビルドとテストが今まで通り通る(137 件 → 新しいテストを足して 161 件)。
 - `BRDF_WITH_TOPCON=ON` で、SDK のある PC でリンクまで通る。
 - フェイクの `ITopconApi` を使ったテストで、成功の手順の順序、各段階の失敗、解放漏れがないこと(作ったものと同数を解放)を確認する。
 - 生成したレシピ XML が、旧の `recipe.xml` と(日付・コメント・装置の種類以外)一致する。

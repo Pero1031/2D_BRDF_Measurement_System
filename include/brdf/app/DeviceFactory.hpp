@@ -5,9 +5,13 @@
 
 #pragma once
 
+#include <filesystem>
+#include <memory>
+
 #include "brdf/app/Devices.hpp"
 #include "brdf/core/Error.hpp"
 #include "brdf/domain/Recipe.hpp"
+#include "brdf/driver/topcon/TopconImager.hpp"
 #include "brdf/io/SetupConfig.hpp"
 
 namespace brdf::app {
@@ -22,5 +26,14 @@ namespace brdf::app {
     /// kind が White のとき、シミュレータは標準拡散反射板(完全拡散、反射率は [sim.white])を測る。
     Result<Devices> makeDevices(const io::SetupConfig& setup,
                                 domain::MeasurementKind kind = domain::MeasurementKind::Sample);
+
+    /// setup.toml の [imager] と [spot_xml] から、実機の分光放射計(TOPCON)の設定を作る。
+    /// work_dir は、レシピとスポット定義の XML を一時的に書く場所。
+    driver::topcon::TopconImagerConfig makeTopconConfig(const io::SetupConfig& setup, const std::filesystem::path& work_dir);
+
+    /// 実機の分光放射計を作る(まだ接続しない)。TOPCON の SDK なしでビルドした版(BRDF_WITH_TOPCON=OFF)では
+    /// NotImplemented を返す。
+    Result<std::shared_ptr<driver::ISpectralImager>> makeTopconImager(const io::SetupConfig& setup,
+                                                                      const std::filesystem::path& work_dir);
 
 } // namespace brdf::app

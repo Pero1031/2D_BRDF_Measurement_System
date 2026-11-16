@@ -15,7 +15,7 @@ checklist = [
 ]
 
 [capture]
-integration_time_ms = 100.0
+integration_time_ms = 100.0   # 0 = 装置が自動で決める(実機)
 arm_speed = 0.5   # 0 より大きく 1 以下
 wavelength_start = 380.0
 wavelength_end = 780.0

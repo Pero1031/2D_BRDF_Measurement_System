@@ -35,6 +35,7 @@ namespace {
         CHECK(a.imager.device == b.imager.device);
         CHECK(a.imager.binning == b.imager.binning);
         CHECK(a.imager.lens == b.imager.lens);
+        CHECK(a.imager.calibration_dir == b.imager.calibration_dir);
         CHECK(a.imager.width() == b.imager.width());
         CHECK(a.imager.height() == b.imager.height());
         CHECK_THAT(a.spot_xml.spot_size, WithinAbs(b.spot_xml.spot_size, 1e-12));
@@ -100,6 +101,7 @@ TEST_CASE("a modified setup survives a write/read round trip", "[config]") {
     c.imager.device = "SR5000";
     c.imager.binning = "BINNING_TYPE2";
     c.imager.lens = "WIDE";
+    c.imager.calibration_dir = "D:/sdk/Calibration";
     c.imager.image_width = 640;
     c.spot_xml.spot_size = 3.0;
     c.analysis.white_reflectance = 0.97;

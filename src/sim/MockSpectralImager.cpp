@@ -39,8 +39,8 @@ namespace brdf::sim {
             return fail(ErrorCode::InvalidArgument,
                         "imager: no calibration board is set up in the simulator (see [calibration.board] in setup.toml)");
         }
-        if (!(request.integration_time_ms > 0.0)) {
-            return fail(ErrorCode::InvalidArgument, "imager: integration time must be positive");
+        if (request.integration_time_ms < 0.0) {
+            return fail(ErrorCode::InvalidArgument, "imager: integration time must not be negative (0 = automatic)");
         }
 
         const geometry::SurfaceFrame sample = rig_->sampleFrame();
@@ -98,8 +98,8 @@ namespace brdf::sim {
         if (request.spots.empty()) {
             return fail(ErrorCode::InvalidArgument, "imager: no spots requested");
         }
-        if (!(request.integration_time_ms > 0.0)) {
-            return fail(ErrorCode::InvalidArgument, "imager: integration time must be positive");
+        if (request.integration_time_ms < 0.0) {
+            return fail(ErrorCode::InvalidArgument, "imager: integration time must not be negative (0 = automatic)");
         }
         const auto& wr = request.wavelengths;
         if (!(wr.step > 0.0) || !(wr.end >= wr.start)) {
@@ -126,7 +126,8 @@ namespace brdf::sim {
         const int n = wr.count();
         result.wavelengths.resize(n);
         for (int i = 0; i < n; ++i) result.wavelengths(i) = wr.start + wr.step * i;
-        result.integration_time_ms = request.integration_time_ms;
+        // 自動(0)のとき、シミュレータは 100 ms を使ったことにする(放射輝度は積分時間によらない)
+        result.integration_time_ms = request.integration_time_ms > 0.0 ? request.integration_time_ms : 100.0;
         result.measure_distance_mm = request.measure_distance_mm;
 
         std::mt19937 rng(options_.seed + capture_count_++);

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Recipe version="1.1" datetime="" comment="">
+	<BaseWhitePoint type="D65" x="0.00000" y="0.00000"/>
+	<MeasurementCondition>
+		<DeviceType type="SR5000"/>
+		<BinningType type="BINNING_TYPE1"/>
+		<LensType type="STANDARD"/>
+		<MeasureDistance mm="1000"/>
+		<MeasureTimingType type="SERIAL">
+			<Serial count="1"/>
+			<IntervalConditionList>
+				<IntervalCondition sec="0" count="0"/>
+				<IntervalCondition sec="0" count="0"/>
+				<IntervalCondition sec="0" count="0"/>
+				<IntervalCondition sec="0" count="0"/>
+				<IntervalCondition sec="0" count="0"/>
+			</IntervalConditionList>
+			<OptimizeFirstOnly enable="FALSE"/>
+			<IntervalInterrupt enable="FALSE"/>
+		</MeasureTimingType>
+		<LayerMode enable="FALSE" count="2"/>
+		<MeasurementType type="SPECTRAL"/>
+		<FilterCondition>
+			<SpectralFilter enable="TRUE" integration_time_type="AUTO" integration_time="100" gain_type="AUTO" gain="" frequency_calc_enable="FALSE" frequency_value="50" averaging_count="1"/>
+			<XFilter enable="TRUE" integration_time_type="AUTO" integration_time="100" gain_type="AUTO" gain="GAIN_TYPE1" frequency_calc_enable="FALSE" frequency_value="50" averaging_count="1"/>
+			<YFilter enable="TRUE" integration_time_type="AUTO" integration_time="100" gain_type="AUTO" gain="GAIN_TYPE1" frequency_calc_enable="FALSE" frequency_value="50" averaging_count="1"/>
+			<ZFilter enable="TRUE" integration_time_type="AUTO" integration_time="100" gain_type="AUTO" gain="GAIN_TYPE1" frequency_calc_enable="FALSE" frequency_value="50" averaging_count="1"/>
+		</FilterCondition>
+		<SaturationDetectionType type="INTERRUPT"/>
+		<TriggerConfig mode_type="SOFT" activation_type="RISING" delay_time="0"/>
+		<ScanType type="NORMAL"/>
+		<MeasurementWaveLength min="380" max="780" step="1"/>
+		<MeasurementRange left="0" top="0" right="1376" bottom="1024"/>
+		<OptimizationArea left="0" top="0" right="1376" bottom="1024"/>
+		<ImageRotationType type="NONE"/>
+	</MeasurementCondition>
+	<DiagonalCorrection enable="FALSE"/>
+	<ColorCorrection enable="FALSE"/>
+	<LuminosityCorrection enable="FALSE"/>
+	<AreaCorrection enable="FALSE"/>
+	<WhitePlateData enable="FALSE" filename="" xn="0" yn="0" zn="0" type="FILE"/>
+</Recipe>

@@ -32,7 +32,7 @@ namespace brdf::driver {
     /// 1 回の撮影の要求。旧システムの「レシピ XML + スポット XML」に相当する。
     struct CaptureRequest {
         Real measure_distance_mm = 1000.0;     ///< カメラから試料までの距離(ピント合わせに使う)
-        Real integration_time_ms = 100.0;      ///< 積分時間
+        Real integration_time_ms = 100.0;      ///< 積分時間。0 のときは装置が自動で決める(旧システムと同じ)
         WavelengthRange wavelengths;           ///< 測定する波長範囲
         std::vector<SpotRequest> spots;        ///< 測定したい点(1 点以上)
     };
@@ -55,7 +55,7 @@ namespace brdf::driver {
     /// 明るさの画像 1 枚の撮影の要求。キャリブボードの撮影に使う。
     struct ImageRequest {
         Real measure_distance_mm = 1000.0;     ///< カメラから試料までの距離(ピント合わせに使う)
-        Real integration_time_ms = 100.0;      ///< 積分時間
+        Real integration_time_ms = 100.0;      ///< 積分時間。0 のときは装置の既定値(実機)
     };
 
     /// 2D 分光放射計のインターフェース。実機(TOPCON SR-5000H)とモックが実装する。

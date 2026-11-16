@@ -21,6 +21,7 @@ namespace brdf {
         Collision,          ///< アーム同士が干渉する姿勢
         FocusError,         ///< 測定距離が実際の距離と合っていない
         DeviceError,        ///< 装置側のエラー
+        Saturated,          ///< 測定値が飽和した(明るすぎる。照明・積分時間・ND フィルタを見直す)
         NotImplemented,     ///< 未実装
     };
 
@@ -33,6 +34,7 @@ namespace brdf {
         case ErrorCode::Collision:       return "Collision";
         case ErrorCode::FocusError:      return "FocusError";
         case ErrorCode::DeviceError:     return "DeviceError";
+        case ErrorCode::Saturated:       return "Saturated";
         case ErrorCode::NotImplemented:  return "NotImplemented";
         }
         return "Unknown";

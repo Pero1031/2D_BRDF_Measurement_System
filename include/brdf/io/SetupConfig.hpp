@@ -32,6 +32,10 @@ namespace brdf::io {
         std::string binning = "BINNING_TYPE1";   ///< "BINNING_TYPE1" / "BINNING_TYPE2" / "BINNING_TYPE4"(SDK と同じ名前)
         std::string lens = "STANDARD";           ///< "WIDE" / "STANDARD" / "TELE" / "MACRO"
 
+        /// 実機: TOPCON の SDK が使う校正データのフォルダ。インストーラの標準の場所が既定値。
+        /// (SDK の約束であり、プロジェクトの持ち物ではないので、絶対パスを許す唯一の設定)
+        std::string calibration_dir = "C:/Program Files/TopconTechnohouse/CI-100/Calibration";
+
         /// 画像の大きさ [pixel]。省略すると、機種とビニングから決まる。
         std::optional<int> image_width;
         std::optional<int> image_height;

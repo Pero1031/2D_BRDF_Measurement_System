@@ -7,6 +7,11 @@
 
 #include <memory>
 
+#ifdef BRDF_WITH_TOPCON
+#include "brdf/driver/topcon/RealHsApi.hpp"
+#endif
+
+#include "brdf/driver/topcon/TopconImager.hpp"
 #include "brdf/sim/BrdfModel.hpp"
 #include "brdf/sim/CameraSpotProjector.hpp"
 #include "brdf/sim/MockRobotArm.hpp"
@@ -30,7 +35,7 @@ namespace brdf::app {
     Result<Devices> makeDevices(const io::SetupConfig& setup, domain::MeasurementKind kind) {
         if (setup.mode == io::DeviceMode::Real) {
             return fail(ErrorCode::NotImplemented,
-                        "devices.mode = \"real\" is not supported yet (real drivers are planned for P6); use \"sim\"");
+                        "devices.mode = \"real\" is not supported yet (the robot arm driver is still to come); use \"sim\"");
         }
 
         // カメラ: 位置は装置の配置から、向きは設定、無ければ既定
@@ -62,6 +67,32 @@ namespace brdf::app {
             d.projector = std::make_shared<sim::CameraSpotProjector>(rig);
         }
         return d;
+    }
+
+driver::topcon::TopconImagerConfig makeTopconConfig(const io::SetupConfig& setup, const std::filesystem::path& work_dir) {
+        driver::topcon::TopconImagerConfig c;
+        c.calibration_dir = setup.imager.calibration_dir;
+        c.device = setup.imager.device;
+        c.binning = setup.imager.binning;
+        c.lens = setup.imager.lens;
+        c.image_width = setup.imager.width();
+        c.image_height = setup.imager.height();
+        c.spot_size = setup.spot_xml.spot_size;
+        c.work_dir = work_dir;
+        return c;
+    }
+
+    Result<std::shared_ptr<driver::ISpectralImager>> makeTopconImager(const io::SetupConfig& setup,
+                                                                      const std::filesystem::path& work_dir) {
+#ifdef BRDF_WITH_TOPCON
+        return std::make_shared<driver::topcon::TopconImager>(std::make_shared<driver::topcon::RealHsApi>(),
+                                                              makeTopconConfig(setup, work_dir));
+#else
+        (void)setup;
+        (void)work_dir;
+        return fail(ErrorCode::NotImplemented,
+                    "this build has no TOPCON SDK support (configure with -DBRDF_WITH_TOPCON=ON -DHS_SDK_DIR=<SDK folder>)");
+#endif
     }
 
 } // namespace brdf::app

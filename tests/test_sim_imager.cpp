@@ -91,10 +91,15 @@ TEST_CASE("MockSpectralImager rejects bad requests", "[sim][imager]") {
         REQUIRE_FALSE(r.has_value());
         CHECK(r.error().code == ErrorCode::InvalidArgument);
     }
-    SECTION("integration time must be positive") {
-        const auto r = w.imager.capture(w.request({kCentre}, 0.0));
+    SECTION("integration time must not be negative") {
+        const auto r = w.imager.capture(w.request({kCentre}, -1.0));
         REQUIRE_FALSE(r.has_value());
         CHECK(r.error().code == ErrorCode::InvalidArgument);
+    }
+    SECTION("integration time 0 means automatic") {
+        const auto r = w.imager.capture(w.request({kCentre}, 0.0));
+        REQUIRE(r.has_value());
+        CHECK(r->integration_time_ms > 0.0);
     }
     SECTION("invalid wavelength range") {
         auto req = w.request({kCentre});
