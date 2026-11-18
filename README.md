@@ -73,6 +73,8 @@ Anything that has been verified on the real devices. `mode = "real"` runs only i
 
 ## Quick start
 
+A step-by-step guide is in [docs/UserGuide.md](docs/UserGuide.md) ([日本語](docs/UserGuide.ja.md)).
+
 ```bash
 build/Debug/brdf.exe check examples/sim_project     # pre-flight check, nothing is moved
 build/Debug/brdf.exe run   examples/sim_project     # simulated measurement; type OK for the checklist (or --yes)
@@ -236,6 +238,7 @@ python tools/check_encoding.py --fix  # fix
 
 ## Documentation
 
+- [docs/UserGuide.md](docs/UserGuide.md): how to use the `brdf` command line, from a simulated trial to a real measurement ([日本語版](docs/UserGuide.ja.md))
 - [docs/LegacySystemAnalysis.md](docs/LegacySystemAnalysis.md): analysis of the previous system and the results of checking against its data (Japanese)
 - [docs/DesignPlan.md](docs/DesignPlan.md): design and development plan (Japanese)
 - [tests/data/README.md](tests/data/README.md): origin of the comparison data (Japanese)
